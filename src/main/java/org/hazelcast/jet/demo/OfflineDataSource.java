@@ -1,11 +1,12 @@
-package com.hazelcast.jet.demo;
+package org.hazelcast.jet.demo;
 
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.HazelcastJsonValue;
+import com.hazelcast.crdt.pncounter.PNCounter;
 import com.hazelcast.internal.json.Json;
 import com.hazelcast.internal.json.JsonArray;
 import com.hazelcast.internal.json.JsonObject;
-import com.hazelcast.jet.demo.util.Util;
+import org.hazelcast.jet.demo.util.Util;
 import com.hazelcast.jet.pipeline.SourceBuilder;
 import com.hazelcast.jet.pipeline.SourceBuilder.TimestampedSourceBuffer;
 import com.hazelcast.jet.pipeline.StreamSource;
@@ -136,8 +137,8 @@ public class OfflineDataSource implements IFlightDataSource {
         HazelcastInstance hzInstance = Util.getHazelcastInstance();
         IMap<Long, HazelcastJsonValue> offlineDataMap = hzInstance.getMap(this.cityName + OFFLINE_DATA_MAP_SUFFIX);
 
+        PNCounter counter = hzInstance.getPNCounter(this.cityName);
         long dataLoadStartEpoch = System.currentTimeMillis();
-        AtomicLong entryCount = new AtomicLong(0L);
 
         try (
                 Stream<Path> entries = Files.walk(Paths.get(Util.getFlightDataLogPath(this.cityName)))
@@ -159,9 +160,7 @@ public class OfflineDataSource implements IFlightDataSource {
                                             minEpoch.accumulateAndGet(updateEpoch, Math::min);
                                         }
 
-                                        offlineDataMap.put(entryCount.get(), new HazelcastJsonValue(line));
-
-                                        entryCount.getAndIncrement();
+                                        offlineDataMap.put(counter.getAndIncrement(), new HazelcastJsonValue(line));
 
                                     });
                                 } catch (IOException e) {
@@ -175,11 +174,11 @@ public class OfflineDataSource implements IFlightDataSource {
             );
 
         } catch (Exception e) {
-            logger.severe("Error loading data . A total of [" + entryCount.get() + "] flight positions were loaded for [" + cityName + "] in " + (System.currentTimeMillis() - dataLoadStartEpoch) + "ms");
+            logger.severe("Error loading data . A total of [" + counter.get() + "] flight positions were loaded for [" + cityName + "] in " + (System.currentTimeMillis() - dataLoadStartEpoch) + "ms");
             System.out.println(e.toString());
             e.printStackTrace();
         }
 
-        logger.info("Successfully loaded offline data. A total of [" + entryCount.get() + "] flight positions were loaded for [" + cityName + "] in " + (System.currentTimeMillis() - dataLoadStartEpoch) + "ms");
+        logger.info("Successfully loaded offline data. A total of [" + counter.get() + "] flight positions were loaded for [" + cityName + "] in " + (System.currentTimeMillis() - dataLoadStartEpoch) + "ms");
     }
 }

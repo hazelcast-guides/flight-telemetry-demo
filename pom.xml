@@ -16,9 +16,9 @@
             <url>https://oss.sonatype.org/content/repositories/snapshots</url>
         </repository>
         <repository>
-            <id>release-repository</id>
-            <name>release repository</name>
-            <url>https://oss.sonatype.org/content/repositories/releases</url>
+            <id>hazelcast-ee</id>
+            <name>Sonatype Repository</name>
+            <url>https://repository.hazelcast.com/release</url>
         </repository>
         <repository>
             <id>main-repo</id>
@@ -31,13 +31,18 @@
     </repositories>
 
     <properties>
-        <maven.compiler.release>17</maven.compiler.release>
-        <jdk.version>17</jdk.version>
-        <hazelcast.version>5.2-SNAPSHOT</hazelcast.version>
+        <maven.compiler.release>11</maven.compiler.release>
+        <jdk.version>11</jdk.version>
         <maven.compiler.plugin.version>3.8.1</maven.compiler.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <!-- Select your Hazelcast dependency (defaults to open source) -->
+
+        <!-- Select your Hazelcast dependency -->
+        <!-- open source -->
+        <hazelcast.version>5.2-SNAPSHOT</hazelcast.version>
         <hazelcast.jar>hazelcast</hazelcast.jar>
+
+        <!-- viridian or enterprise -->
+        <!--hazelcast.version>5.1</hazelcast.version-->
         <!--hazelcast.jar>hazelcast-enterprise</hazelcast.jar-->
     </properties>
 
@@ -62,7 +67,7 @@
                     </descriptorRefs>
                     <archive>
                         <manifest>
-                            <mainClass>com.hazelcast.jet.demo.FlightTelemetry</mainClass>
+                            <mainClass>org.hazelcast.jet.demo.FlightTelemetry</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
@@ -77,16 +82,41 @@
                 </executions>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.3.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <finalName>${project.artifactId}-${project.version}-jar-for-viridian</finalName>
+                            <minimizeJar>true</minimizeJar>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>com/hazelcast/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <configuration>
-                    <mainClass>com.hazelcast.jet.demo.FlightTelemetry</mainClass>
-                    <systemProperties>
+                    <mainClass>org.hazelcast.jet.demo.FlightTelemetry</mainClass>
+                    <!--systemProperties>
                         <systemProperty>
                             <key>hazelcast.enterprise.license.key</key>
-                            <value>PLATFORM#10Nodes#q9AdNEuYwk0HG5TyWgfCKB8mZXOjMSUlbn6iDQJ12P65919101091011190101090290111111009000111301</value>
+                            <value><YOUR_KEY_GOES_HERE></value>
                         </systemProperty>
-                    </systemProperties>
+                    </systemProperties-->
                 </configuration>
             </plugin>
         </plugins>
@@ -107,10 +137,11 @@
             <artifactId>${hazelcast.jar}</artifactId>
             <version>${hazelcast.version}</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/net.razorvine/pickle -->
         <dependency>
-            <groupId>org.python</groupId>
-            <artifactId>jython</artifactId>
-            <version>2.7.1b3</version>
+            <groupId>net.razorvine</groupId>
+            <artifactId>pickle</artifactId>
+            <version>1.3</version>
         </dependency>
         <dependency>
             <groupId>log4j</groupId>

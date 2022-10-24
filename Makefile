@@ -18,10 +18,10 @@ clean : prep
 	docker-compose build --no-cache && docker-compose up -d
 
 up : prep
-	docker-compose up -d
+	docker-compose --profile=${FLIGHT_TELEMETRY_HZ_INSTANCE_MODE} up -d
 
 down :
-	docker-compose down
+	docker-compose --profile=${FLIGHT_TELEMETRY_HZ_INSTANCE_MODE} down
 
 shell :
 	docker exec -ti $(CONTAINER) /bin/bash

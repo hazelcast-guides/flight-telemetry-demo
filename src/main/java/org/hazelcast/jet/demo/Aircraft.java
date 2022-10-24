@@ -1,18 +1,18 @@
-package com.hazelcast.jet.demo;
+package org.hazelcast.jet.demo;
 
 import com.hazelcast.internal.json.JsonObject;
-import com.hazelcast.jet.demo.types.WakeTurbulanceCategory;
+import org.hazelcast.jet.demo.types.WakeTurbulanceCategory;
 import com.hazelcast.jet.impl.util.Util;
 import com.hazelcast.json.internal.JsonSerializable;
 
 import java.io.Serializable;
 import java.util.List;
 
-import static com.hazelcast.jet.demo.util.Util.asDouble;
-import static com.hazelcast.jet.demo.util.Util.asInt;
-import static com.hazelcast.jet.demo.util.Util.asLong;
-import static com.hazelcast.jet.demo.util.Util.asString;
-import static com.hazelcast.jet.demo.util.Util.asStringArray;
+import static org.hazelcast.jet.demo.util.Util.asDouble;
+import static org.hazelcast.jet.demo.util.Util.asInt;
+import static org.hazelcast.jet.demo.util.Util.asLong;
+import static org.hazelcast.jet.demo.util.Util.asString;
+import static org.hazelcast.jet.demo.util.Util.asStringArray;
 
 /**
  * DTO represents an aircraft.
@@ -258,7 +258,7 @@ public class Aircraft implements JsonSerializable, Serializable {
      * : set of engaged automation modes: ‘autopilot’, ‘vnav’, ‘althold’,
      * ‘approach’, ‘lnav’, ‘tcas’
      */
-    private String nav_modes[];
+    private String[] nav_modes;
 
     /**
      * The aircraft's position in decimal degrees

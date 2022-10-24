@@ -1,18 +1,12 @@
-package com.hazelcast.jet.demo.util;
+package org.hazelcast.jet.demo.util;
 
 import com.hazelcast.core.HazelcastInstance;
-import com.hazelcast.internal.json.JsonObject;
 import com.hazelcast.internal.json.JsonValue;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.EMPTY_LIST;
-
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
 
 /**
  * Helper methods for JSON parsing and geographic calculations.

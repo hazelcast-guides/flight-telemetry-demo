@@ -1,4 +1,4 @@
-package com.hazelcast.jet.demo.types;
+package org.hazelcast.jet.demo.types;
 
 /**
  * The wake turbulence category of the aircraft

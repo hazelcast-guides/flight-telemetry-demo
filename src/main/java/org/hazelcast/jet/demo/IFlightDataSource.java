@@ -1,4 +1,4 @@
-package com.hazelcast.jet.demo;
+package org.hazelcast.jet.demo;
 
 import com.hazelcast.internal.json.JsonObject;
 import com.hazelcast.internal.json.JsonValue;

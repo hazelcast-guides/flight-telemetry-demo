@@ -1,4 +1,4 @@
-package com.hazelcast.jet.demo;
+package org.hazelcast.jet.demo;
 
 import com.hazelcast.internal.json.Json;
 import com.hazelcast.internal.json.JsonArray;
@@ -37,15 +37,15 @@ public class FlightDataSource implements IFlightDataSource{
      * to
      * obtain an API key.
      */
-    protected static String API_AUTHENTICATION_KEY = "YOUR_API_KEY_HERE";
+    protected String API_AUTHENTICATION_KEY = "YOUR_API_KEY_HERE";
 
     /**
      * The API host is provided by Rapid API when you subscribe to the ADBSExchange
      * API.
      */
-    protected static String API_HOST = "YOUR_API_HOST_HERE";
+    protected String API_HOST = "YOUR_API_HOST_HERE";
 
-    protected static boolean WRITE_FLIGHT_TELEMETRY_TO_FILE = false;
+    protected boolean WRITE_FLIGHT_TELEMETRY_TO_FILE = false;
 
     private final URL url;
     private final long pollIntervalMillis;
@@ -58,12 +58,21 @@ public class FlightDataSource implements IFlightDataSource{
     private long lastPoll;
 
 
-    private FlightDataSource(ILogger logger, String url, long pollIntervalMillis ) {
+    private FlightDataSource(ILogger logger, String url, String host, String apiKey, Boolean writeTelemetryToFile, long pollIntervalMillis ) {
 
         this.logger = logger;
 
         try {
             this.url = new URL(url);
+            if (!host.isEmpty()){
+                this.API_HOST = host;
+            }
+
+            if(!apiKey.isEmpty()){
+                this.API_AUTHENTICATION_KEY = apiKey;
+            }
+
+            this.WRITE_FLIGHT_TELEMETRY_TO_FILE = writeTelemetryToFile;
         } catch (MalformedURLException e) {
             throw ExceptionUtil.rethrow(e);
         }
@@ -142,10 +151,10 @@ public class FlightDataSource implements IFlightDataSource{
         return object;
     }
 
-    public static StreamSource<Aircraft> getDataSource(String url, long pollIntervalMillis) {
+    public static StreamSource<Aircraft> getDataSource(String url, String host, String apiKey, Boolean writeTelemetryToFile, long pollIntervalMillis) {
 
         return SourceBuilder.timestampedStream("Flight Data Source",
-                ctx -> new FlightDataSource(ctx.logger(), url, pollIntervalMillis ))
+                ctx -> new FlightDataSource(ctx.logger(), url, host, apiKey, writeTelemetryToFile, pollIntervalMillis ))
                 .fillBufferFn(FlightDataSource::fillBuffer)
                 .build();
 

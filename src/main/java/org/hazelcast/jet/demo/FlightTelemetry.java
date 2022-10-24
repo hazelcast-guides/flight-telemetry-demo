@@ -1,6 +1,8 @@
-package com.hazelcast.jet.demo;
+package org.hazelcast.jet.demo;
 
-import com.hazelcast.config.Config;
+import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.client.config.ClientConfig;
+import com.hazelcast.config.SSLConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.jet.JetService;
@@ -8,27 +10,28 @@ import com.hazelcast.jet.Job;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.config.ProcessingGuarantee;
 import com.hazelcast.jet.datamodel.KeyedWindowResult;
-import com.hazelcast.jet.demo.Aircraft.VerticalDirection;
-import com.hazelcast.jet.demo.types.WakeTurbulanceCategory;
-import com.hazelcast.jet.demo.util.Util;
+import net.razorvine.pickle.Pickler;
+import org.hazelcast.jet.demo.Aircraft.VerticalDirection;
+import org.hazelcast.jet.demo.types.WakeTurbulanceCategory;
+import org.hazelcast.jet.demo.util.Util;
 import com.hazelcast.jet.pipeline.*;
 import com.hazelcast.map.IMap;
 import com.hazelcast.map.listener.EntryAddedListener;
-import org.python.core.PyFloat;
-import org.python.core.PyInteger;
-import org.python.core.PyList;
-import org.python.core.PyString;
-import org.python.core.PyTuple;
-import org.python.modules.cPickle;
+
+//import org.python.core.PyFloat;
+//import org.python.core.PyInteger;
+//import org.python.core.PyList;
+//import org.python.core.PyString;
+//import org.python.core.PyTuple;
+//import org.python.modules.cPickle;
 
 import java.io.BufferedOutputStream;
 import java.net.Socket;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.time.Instant;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.Map;
-import java.util.Optional;
-import java.util.SortedMap;
 import java.util.function.Consumer;
 
 import static com.hazelcast.function.ComparatorEx.comparingInt;
@@ -38,32 +41,32 @@ import static com.hazelcast.jet.aggregate.AggregateOperations.linearTrend;
 import static com.hazelcast.jet.aggregate.AggregateOperations.maxBy;
 import static com.hazelcast.jet.aggregate.AggregateOperations.summingDouble;
 import static com.hazelcast.jet.aggregate.AggregateOperations.toList;
-import static com.hazelcast.jet.demo.Aircraft.VerticalDirection.ASCENDING;
-import static com.hazelcast.jet.demo.Aircraft.VerticalDirection.CRUISE;
-import static com.hazelcast.jet.demo.Aircraft.VerticalDirection.DESCENDING;
-import static com.hazelcast.jet.demo.Aircraft.VerticalDirection.UNKNOWN;
-import static com.hazelcast.jet.demo.Constants.heavyWTCClimbingAltitudeToNoiseDb;
-import static com.hazelcast.jet.demo.Constants.heavyWTCDescendAltitudeToNoiseDb;
-import static com.hazelcast.jet.demo.Constants.mediumWTCClimbingAltitudeToNoiseDb;
-import static com.hazelcast.jet.demo.Constants.mediumWTCDescendAltitudeToNoiseDb;
-import static com.hazelcast.jet.demo.Constants.typeToLTOCycyleC02Emission;
-import static com.hazelcast.jet.demo.types.WakeTurbulanceCategory.HEAVY;
-import static com.hazelcast.jet.demo.util.Util.nearLHR;
-import static com.hazelcast.jet.demo.util.Util.nearLCY;
-import static com.hazelcast.jet.demo.util.Util.nearLGW;
-import static com.hazelcast.jet.demo.util.Util.nearEWR;
-import static com.hazelcast.jet.demo.util.Util.nearJFK;
-import static com.hazelcast.jet.demo.util.Util.nearLGA;
-import static com.hazelcast.jet.demo.util.Util.nearHND;
-import static com.hazelcast.jet.demo.util.Util.nearNRT;
-import static com.hazelcast.jet.demo.util.Util.setHazelcastInstance;
+import static org.hazelcast.jet.demo.Aircraft.VerticalDirection.ASCENDING;
+import static org.hazelcast.jet.demo.Aircraft.VerticalDirection.CRUISE;
+import static org.hazelcast.jet.demo.Aircraft.VerticalDirection.DESCENDING;
+import static org.hazelcast.jet.demo.Aircraft.VerticalDirection.UNKNOWN;
+import static org.hazelcast.jet.demo.Constants.heavyWTCClimbingAltitudeToNoiseDb;
+import static org.hazelcast.jet.demo.Constants.heavyWTCDescendAltitudeToNoiseDb;
+import static org.hazelcast.jet.demo.Constants.mediumWTCClimbingAltitudeToNoiseDb;
+import static org.hazelcast.jet.demo.Constants.mediumWTCDescendAltitudeToNoiseDb;
+import static org.hazelcast.jet.demo.Constants.typeToLTOCycyleC02Emission;
+import static org.hazelcast.jet.demo.types.WakeTurbulanceCategory.HEAVY;
+import static org.hazelcast.jet.demo.util.Util.nearLHR;
+import static org.hazelcast.jet.demo.util.Util.nearLCY;
+import static org.hazelcast.jet.demo.util.Util.nearLGW;
+import static org.hazelcast.jet.demo.util.Util.nearEWR;
+import static org.hazelcast.jet.demo.util.Util.nearJFK;
+import static org.hazelcast.jet.demo.util.Util.nearLGA;
+import static org.hazelcast.jet.demo.util.Util.nearHND;
+import static org.hazelcast.jet.demo.util.Util.nearNRT;
+import static org.hazelcast.jet.demo.util.Util.setHazelcastInstance;
 import static com.hazelcast.jet.pipeline.SinkBuilder.sinkBuilder;
 import static java.util.Collections.emptySortedMap;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
- * This demo reads an ADS-B telemetry stream from the [ADS-B Exchange](https://www.adsbexchange.com/)
- * (see [ADS-B Exchange API](https://www.adsbexchange.com/data)) which returns the
+ * This demo reads an ADS-B telemetry stream from the [ADS-B Exchange](<a href="https://www.adsbexchange.com/">...</a>)
+ * (see [ADS-B Exchange API](<a href="https://www.adsbexchange.com/data">...</a>)) which returns the
  * real-time positions of commercial aircraft flying within a defined radius of one or
  * more points around the globe.
  * <p>
@@ -83,14 +86,14 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  * by a Grafana dashboard.
  * <p>
  * This demo can run in both online and offline mode. The online mode will retrieve
- * realtime flight positions from the ADS-B exchange API (please see the READM for 
- * instructions on how to sign-up for an ADS-B Exchange API key). The offline mode 
- * uses around 30 minutes of flight data captured during September 2022 which 
+ * realtime flight positions from the ADS-B exchange API (please see the READM for
+ * instructions on how to sign-up for an ADS-B Exchange API key). The offline mode
+ * uses around 30 minutes of flight data captured during September 2022 which
  * ADS-B Exchange have kindly allowed us to distribute for your convenience.
  * <p>
  * In summary, the demo will calculate following metrics in real-time
  * - Filter out planes outside defined airport / metropolitan areas
- * - Sliding over last 1 minute to detect, whether the plane is ascending, descending or staying in the same level 
+ * - Sliding over last 1 minute to detect, whether the plane is ascending, descending or staying in the same level
  * - Based on the plane type and phase of the flight provides information about maximum noise levels nearby to the airport and estimated C02 emissions for a region
  * <p>
  * The result of these are sent to three sinks (take off map, landing map and Graphite)
@@ -98,8 +101,8 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  * <p>
  * The DAG used to model Flight Telemetry calculations can be seen below:
  * The following DAG (displayed as ascii) illustrates the pipeline and executions paths
- * the same DAG can be seen in the application log on startup or viewed as an SVG 
- * image in Hazelcast management center (the diagram in Management center is interactive 
+ * the same DAG can be seen in the application log on startup or viewed as an SVG
+ * image in Hazelcast management center (the diagram in Management center is interactive
  * allowing you to drill into and monitor each job stage)
  * <pre>
  * <pre>
@@ -159,143 +162,109 @@ public class FlightTelemetry {
     private static final String CO2_EMISSION_KEY_SUFFIX = "_C02_EMISSION";
     private static final String AVG_NOISE_KEY_SUFFIX = "_AVG_NOISE";
 
-    private static final String SOURCE_URL = "https://adsbexchange-com1.p.rapidapi.com/v2/lat/%.6f/lon/%.6f/dist/%d/";
     private static final int SINK_PORT = 2004;
     private static final String TAKE_OFF_MAP = "takeOffMap";
     private static final String LANDING_MAP = "landingMap";
     private static final String FLIGHT_TELEMETRY_SINK_HOST;
     private static final String FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY;
     private static final String FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST;
+    private static final String FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_URI;
     private static final String FLIGHT_TELEMETRY_USE_OFFLINE_DATA;
     private static final String FLIGHT_TELEMETRY_WRITE_TO_FILE;
+    private static final String FLIGHT_TELEMETRY_HZ_INSTANCE_MODE;
 
-    private static final Map<String, Map<String, String>> configData =
-            Map.of(
-                    "London", Map.of(
-                            // Setting to radar radius to 70 KM to pickup approach traffic for the three main London airports
-                            // (distance between airports is
-                            //      39K between LHR and LGW,
-                            //      42KM between LGW and LCY and
-                            //      35KM between LCY and LHR)
-                            "RADAR_RADIUS", "31", // Half max distance + 10KM
+    private static final String FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE;
+    private static final String FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE_PASSWORD;
+    private static final String FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE;
+    private static final String FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE_PASSWORD;
+    private static final String FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_DISCOVERYTOKEN;
+    private static final String FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_URL;
+    private static final String FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_CLUSTERNAME;
 
-                            // This is the lat long for North London Cricket Club which is the center point of all London airports
-                            "RADAR_LAT", "51.5798373",
-                            "RADAR_LON", "-0.1387518",
-
-                            // Floor is the minimum altitude we consider a flight for altitude trend analysis
-                            // we want to detect aircraft off the ground but still ascending (usually 100
-                            // + the altitude of the highest airport - Gatwick is 62M/203ft)
-                            // Ceiling is the maximum altitude we consider a flight for altitude trend analysis (usually 3000 + the floor)
-                            "FLOOR", "303",
-                            "CEILING", "3303"
-                    ),
-
-                    "New York", Map.of(
-                            // Setting to radar radius to 70 KM to pickup approach traffic for the three main New York airports
-                            // (distance between airports is
-                            //      33K between EWR and JFK,
-                            //      16KM between JFK and LGA and
-                            //      27KM between LGA and EWR)
-                            "RADAR_RADIUS", "32", // Half max distance + 10KM
-
-                            // This is the lat long for 16 Manhattan Ave, Brooklyn, NY 11206 an undistinguished address in Manhattan
-                            // which is the approximate center point of JFK, EWR and LGA airports
-                            "RADAR_LAT", "40.702654",
-                            "RADAR_LON", "-73.944399",
-
-                            // Floor is the minimum altitude we consider a flight for altitude trend analysis
-                            // we want to detect aircraft off the ground but still ascending (usually 100
-                            // + the altitude of the highest airport - LaGuardia is 6M/20ft)
-                            // Ceiling is the maximum altitude we consider a flight for altitude trend analysis (usually 3000 + the floor)
-                            "FLOOR", "120",
-                            "CEILING", "3120"
-                    ),
-                    "Tokyo", Map.of(
-                            // Setting to radar radius to 70 KM to pickup traffic for all Tokyo airports
-                            // (distance between airports is
-                            //      65K between NRT and HND)
-                            "RADAR_RADIUS", "80",  // Half max distance + 10KM
-
-                            // This is the lat long for Kaihimmakuhari Station
-                            // which is the approximate center point of HND and NRT airports
-                            "RADAR_LAT", "35.6484242",
-                            "RADAR_LON", "140.0394978",
-
-                            // Floor is the minimum altitude we consider a flight for altitude trend analysis
-                            // we want to detect aircraft off the ground but still ascending (usually 100
-                            // + the altitude of the highest airport - Narita is 43M/141ft)
-                            // Ceiling is the maximum altitude we consider a flight for altitude trend analysis (usually 3000 + the floor)
-                            "FLOOR", "241",
-                            "CEILING", "3241"
-                    )
-            );
+    private static final Map<String, Map<String, String>> configData = FlightDataSourceConfig.getLowBandwidthConfig();
 
     static {
         System.setProperty("hazelcast.logging.type", "log4j");
+
+        // Config for ADSB exchange API
+        FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY = getConfigurationParameter("FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY", "YOUR_API_KEY_HERE");
+        FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST = getConfigurationParameter("FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST", "YOUR_API_HOST_HERE");
+        FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_URI = getConfigurationParameter("FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_URI", "https://adsbexchange-com1.p.rapidapi.com/v2/lat/%.6f/lon/%.6f/dist/%d/");
+
+        // General pipeline config
         FLIGHT_TELEMETRY_SINK_HOST = getConfigurationParameter("FLIGHT_TELEMETRY_SINK_HOST", "127.0.0.1");
-        FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY = getConfigurationParameter("FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY");
-        FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST = getConfigurationParameter("FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST");
         FLIGHT_TELEMETRY_USE_OFFLINE_DATA = getConfigurationParameter("FLIGHT_TELEMETRY_USE_OFFLINE_DATA");
         FLIGHT_TELEMETRY_WRITE_TO_FILE = getConfigurationParameter("FLIGHT_TELEMETRY_WRITE_TO_FILE");
+        FLIGHT_TELEMETRY_HZ_INSTANCE_MODE = getConfigurationParameter("FLIGHT_TELEMETRY_HZ_INSTANCE_MODE", "embedded");
+
+        // Config for viridian
+        FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE = getConfigurationParameter("FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE", "client.keystore");
+        FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE_PASSWORD = getConfigurationParameter("FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE_PASSWORD");
+        FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE = getConfigurationParameter("FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE", "client.truststore");
+        FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE_PASSWORD = getConfigurationParameter("FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE_PASSWORD");
+        FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_DISCOVERYTOKEN = getConfigurationParameter("FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_DISCOVERYTOKEN");
+        FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_URL = getConfigurationParameter("FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_URL", "https://api.viridian.hazelcast.com");
+        FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_CLUSTERNAME = getConfigurationParameter("FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_CLUSTERNAME");
     }
 
     public static void main(String[] args) {
         boolean useOfflineDataSource = Boolean.parseBoolean(FLIGHT_TELEMETRY_USE_OFFLINE_DATA);
         boolean writeTelemetryToFile = Boolean.parseBoolean(FLIGHT_TELEMETRY_WRITE_TO_FILE);
+        HazelcastInstance hzInstance;
 
         // If we are not using offline data check the required values have been passed
         if (!useOfflineDataSource) {
             if (
-                    FlightDataSource.API_AUTHENTICATION_KEY.equals("YOUR_API_KEY_HERE")
+                    FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY.equals("YOUR_API_KEY_HERE")
             ) {
-                if (FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY.isEmpty()) {
-                    System.err.println("""
-                            ADSB_EXCHANGE_API_KEY must be set in one of the following :\s
-                            \tenvironment variable ADSB_EXCHANGE_API_KEY\s
-                            \tsystem property ADSB_EXCHANGE_API_KEY\s
-                            \tor provide it in FlightDataSource.java\s
-                            \s
-                            Using historical flight data to simulate real-time stream!""");
+                System.err.println("\n" +
+                        "ADSB_EXCHANGE_API_KEY must be set in one of the following :\n" +
+                        "\tenvironment variable ADSB_EXCHANGE_API_KEY\n" +
+                        "\tsystem property ADSB_EXCHANGE_API_KEY\n" +
+                        "\tor provide it in FlightDataSource.java\n" +
+                        "\n" +
+                        "Using historical flight data to simulate real-time stream!");
 
-                    useOfflineDataSource = true;
-                } else {
-                    FlightDataSource.API_AUTHENTICATION_KEY = FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY;
-                    System.out.println("Using ADSB Exchange API Key : " + FlightDataSource.API_AUTHENTICATION_KEY);
-                }
+                useOfflineDataSource = true;
+            } else {
+                System.out.println("Using ADSB Exchange API Key : " + FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY);
             }
 
             if (
-                    FlightDataSource.API_HOST.equals("YOUR_API_HOST_HERE")
+                    FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST.equals("YOUR_API_HOST_HERE")
             ) {
-                if (FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST.isEmpty()) {
-                    System.err.println("""
-                            ADSB_EXCHANGE_API_HOST must be set in one of the following :\s
-                            \tenvironment variable ADSB_EXCHANGE_API_HOST\s
-                            \tsystem property ADSB_EXCHANGE_API_HOST\s
-                            \tor provide it in FlightDataSource.java\s
-                            \s
-                            Using historical flight data to simulate real-time stream!""");
+                System.err.println("\n" +
+                        "ADSB_EXCHANGE_API_HOST must be set in one of the following :\n" +
+                        "\tenvironment variable ADSB_EXCHANGE_API_HOST\n" +
+                        "\tsystem property ADSB_EXCHANGE_API_HOST\n" +
+                        "\tor provide it in FlightDataSource.java\n" +
+                        "\n" +
+                        "Using historical flight data to simulate real-time stream!");
 
-                    useOfflineDataSource = true;
-                } else {
-                    FlightDataSource.API_HOST = FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST;
-                    System.out.println("Using ADSB Exchange API Host : " + FlightDataSource.API_HOST);
-                }
+                useOfflineDataSource = true;
+            } else {
+                System.out.println("Using ADSB Exchange API Host : " + FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST);
             }
         }
 
-        if(writeTelemetryToFile && !useOfflineDataSource) {
-            System.out.println("Flight telemetry for will be written to a file for future playback.");
+        if (writeTelemetryToFile && !useOfflineDataSource) {
+            System.out.println("Flight telemetry will be written to a file for future playback.");
         } else {
-            System.out.println("WARNING: Both use offline data and write telemetry data to disk are turned on however this is not "
-                    + "allowed, writing telemetry to disk will be turned off.");
+            if (writeTelemetryToFile && useOfflineDataSource) {
+                System.out.println("WARNING: Both use offline data and write telemetry data to file are turned on however "
+                        + "this is not allowed, writing telemetry to file will be automatically turned off.");
+            }
             // Do not write offline data over itself
             writeTelemetryToFile = false;
         }
 
-        HazelcastInstance hzInstance = getHzInstance();
-        setHazelcastInstance(hzInstance);
+        try {
+            hzInstance = getHzInstance();
+            setHazelcastInstance(hzInstance);
+        } catch (URISyntaxException e) {
+            System.out.println("ERROR: Could not create or connect to the Hazelcast instance (instance mode was set to [" + FLIGHT_TELEMETRY_HZ_INSTANCE_MODE + "].");
+            return;
+        }
 
         addListener(hzInstance.getMap(TAKE_OFF_MAP), a -> System.out.println("New aircraft taking off: " + a));
         addListener(hzInstance.getMap(LANDING_MAP), a -> System.out.println("New aircraft landing " + a));
@@ -319,7 +288,11 @@ public class FlightTelemetry {
                             dataSource = OfflineDataSource.getDataSource("", hzInstance, e, 10000);
 
                         } else {
-                            dataSource = FlightDataSource.getDataSource(String.format(SOURCE_URL, radarLatitude, radarLongitude, radarRadius),
+                            dataSource = FlightDataSource.getDataSource(
+                                    String.format(FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_URI, radarLatitude, radarLongitude, radarRadius),
+                                    FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST,
+                                    FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY,
+                                    finalWriteTelemetryToFile,
                                     10000
                             );
                         }
@@ -335,6 +308,7 @@ public class FlightTelemetry {
                         JetService jetService = hzInstance.getJet();
                         Job job = jetService.newJob(pipeline, new JobConfig().setName("FlightTelemetry-" + e)
                                 .setProcessingGuarantee(ProcessingGuarantee.EXACTLY_ONCE));
+
                         job.join();
 
 
@@ -365,10 +339,28 @@ public class FlightTelemetry {
         return Optional.ofNullable(System.getenv(name));
     }
 
-    private static HazelcastInstance getHzInstance() {
-        String bootstrap = System.getProperty("bootstrap");
-        if (bootstrap != null && bootstrap.equals("true")) {
-            return Hazelcast.bootstrappedInstance();
+    private static HazelcastInstance getHzInstance() throws URISyntaxException {
+        if (FLIGHT_TELEMETRY_HZ_INSTANCE_MODE != null) {
+            if (FLIGHT_TELEMETRY_HZ_INSTANCE_MODE.equals("bootstrap")) {
+                return Hazelcast.bootstrappedInstance();
+            } else if (FLIGHT_TELEMETRY_HZ_INSTANCE_MODE.equals("viridian")) {
+                ClassLoader classLoader = FlightTelemetry.class.getClassLoader();
+                Properties props = new Properties();
+                props.setProperty("javax.net.ssl.keyStore", classLoader.getResource(FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE).toURI().getPath());
+                props.setProperty("javax.net.ssl.keyStorePassword", FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE_PASSWORD);
+                props.setProperty("javax.net.ssl.trustStore",
+                        classLoader.getResource(FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE).toURI().getPath());
+                props.setProperty("javax.net.ssl.trustStorePassword", FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE_PASSWORD);
+                ClientConfig config = new ClientConfig();
+                config.getNetworkConfig().setSSLConfig(new SSLConfig().setEnabled(true).setProperties(props));
+                config.getNetworkConfig().getCloudConfig()
+                        .setDiscoveryToken(FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_DISCOVERYTOKEN)
+                        .setEnabled(true);
+                config.setProperty("hazelcast.client.cloud.url", FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_URL);
+                config.setClusterName(FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_CLUSTERNAME);
+
+                return HazelcastClient.newHazelcastClient(config);
+            }
         }
 
         return Hazelcast.newHazelcastInstance();
@@ -466,7 +458,7 @@ public class FlightTelemetry {
 
 
         // Build Graphite sink
-        Sink<KeyedWindowResult> graphiteSink = buildGraphiteSink(FLIGHT_TELEMETRY_SINK_HOST, SINK_PORT);
+        Sink<KeyedWindowResult> graphiteSink = buildGraphiteSink2(FLIGHT_TELEMETRY_SINK_HOST, SINK_PORT);
 
         // Drain all results to the Graphite sink
         p.writeTo(graphiteSink, co2Emission, maxNoise, landingFlights, takingOffFlights)
@@ -482,9 +474,10 @@ public class FlightTelemetry {
      * @param host Graphite host
      * @param port Graphite port
      */
-    private static Sink<KeyedWindowResult> buildGraphiteSink(String host, int port) {
+    /*private static Sink<KeyedWindowResult> buildGraphiteSink(String host, int port) {
         return sinkBuilder("graphite", instance ->
-                new BufferedOutputStream(new Socket(host, port).getOutputStream()))
+                new BufferedOutputStream(
+                        new Socket(host, port).getOutputStream()))
                 .<KeyedWindowResult>receiveFn((bos, entry) -> {
                     GraphiteMetric metric = new GraphiteMetric();
                     metric.from(entry);
@@ -494,6 +487,26 @@ public class FlightTelemetry {
 
                     bos.write(header);
                     bos.write(payload.toBytes());
+                })
+                .flushFn(BufferedOutputStream::flush)
+                .destroyFn(BufferedOutputStream::close)
+                .build();
+    }*/
+    private static Sink<KeyedWindowResult> buildGraphiteSink2(String host, int port) {
+        return sinkBuilder("graphite", instance ->
+                new BufferedOutputStream(
+                        new Socket(host, port).getOutputStream()))
+                .<KeyedWindowResult>receiveFn((bos, entry) -> {
+                    GraphiteMetric2 metric = new GraphiteMetric2();
+                    metric.from(entry);
+
+                    Pickler pickler = new Pickler(false);
+                    byte[] payload = pickler.dumps(metric.getAsList());
+                    //PyString payload = cPickle.dumps(metric.getAsList(), 2);
+                    byte[] header = ByteBuffer.allocate(4).putInt(payload.length).array();
+
+                    bos.write(header);
+                    bos.write(payload);
                 })
                 .flushFn(BufferedOutputStream::flush)
                 .destroyFn(BufferedOutputStream::close)
@@ -629,7 +642,7 @@ public class FlightTelemetry {
     /**
      * A data transfer object for Graphite
      */
-    private static class GraphiteMetric {
+    /*private static class GraphiteMetric {
         PyString metricName;
         PyInteger timestamp;
         PyFloat metricValue;
@@ -680,6 +693,75 @@ public class FlightTelemetry {
         PyList getAsList() {
             PyList list = new PyList();
             PyTuple metric = new PyTuple(metricName, new PyTuple(timestamp, metricValue));
+            list.add(metric);
+            return list;
+        }
+
+        private int getEpochSecond(long millis) {
+            return (int) Instant.ofEpochMilli(millis).getEpochSecond();
+        }
+
+        private String replaceWhiteSpace(String string) {
+            return string.replace(" ", "_");
+        }
+    }*/
+
+    /**
+     * A data transfer object for Graphite
+     */
+    private static class GraphiteMetric2 {
+        String metricName;//PyString metricName;
+        Integer timestamp;//PyInteger timestamp;
+        Float metricValue;//PyFloat metricValue;
+
+        private GraphiteMetric2() {
+        }
+
+        private void fromAirCraftEntry(KeyedWindowResult<String, Aircraft> aircraftEntry) {
+            Aircraft aircraft = aircraftEntry.getValue();
+            metricName = replaceWhiteSpace(aircraft.getairport()) + "." + aircraft.getverticaldirection(); //new PyString(replaceWhiteSpace(aircraft.getairport()) + "." + aircraft.getverticaldirection());
+            timestamp = getEpochSecond(aircraft.getpos_time());//new PyInteger(getEpochSecond(aircraft.getpos_time()));
+            metricValue = 1f; //new PyFloat(1);
+        }
+
+        private void fromMaxNoiseEntry(KeyedWindowResult<String, Integer> entry) {
+            metricName = replaceWhiteSpace(entry.getKey()); //new PyString(replaceWhiteSpace(entry.getKey()));
+            timestamp = getEpochSecond(entry.end()); //new PyInteger(getEpochSecond(entry.end()));
+            metricValue = entry.getValue().floatValue(); //new PyFloat(entry.getValue());
+        }
+
+        private void fromTotalC02Entry(KeyedWindowResult<String, Double> entry) {
+            metricName = replaceWhiteSpace(entry.getKey()); //new PyString(replaceWhiteSpace(entry.getKey()));
+            timestamp = getEpochSecond(entry.end()); //new PyInteger(getEpochSecond(entry.end()));
+            metricValue = entry.getValue().floatValue(); //new PyFloat(entry.getValue());
+        }
+
+        void from(KeyedWindowResult entry) {
+            // We need to check which type of entry we are processing (we tagged the noise and co2 map keys with a suffix
+            // so that we can easily work this out from the key name)
+            if (entry.getKey() instanceof String &&
+                    !(
+                            entry.getKey().toString().endsWith(CO2_EMISSION_KEY_SUFFIX) ||
+                                    entry.getKey().toString().endsWith(AVG_NOISE_KEY_SUFFIX)
+                    )
+            ) {
+                fromAirCraftEntry(entry);
+            } else {
+                // If the key ends with the CO2 suffix, process as CO2 metric
+                if (entry.getKey().toString().endsWith(CO2_EMISSION_KEY_SUFFIX)) {
+                    fromTotalC02Entry(entry);
+                } else {
+                    // This must be a noise entry, process as noise metric
+                    fromMaxNoiseEntry(entry);
+                }
+            }
+        }
+
+        List<Object> getAsList() {
+            List<Object> list = new ArrayList<>();
+            Object[] tupleValue = {timestamp, metricValue};
+            Object[] metric = {metricName, tupleValue};
+
             list.add(metric);
             return list;
         }

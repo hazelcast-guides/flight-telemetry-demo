@@ -3,6 +3,10 @@ data
 log
 
 target/
+src/main/resources/client.*
+
+.java-version
+
 .idea/
 .settings/
 .classpath

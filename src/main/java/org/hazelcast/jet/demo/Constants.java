@@ -1,4 +1,4 @@
-package com.hazelcast.jet.demo;
+package org.hazelcast.jet.demo;
 
 import java.util.HashMap;
 import java.util.Map;

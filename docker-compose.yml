@@ -1,4 +1,4 @@
-version: '2'
+version: '3.9'
 services:
   grafana_graphite:
     build: docker-grafana-graphite/.
@@ -16,6 +16,7 @@ services:
       - ./log/graphite:/opt/graphite/storage/log
       - ./log/supervisor:/var/log/supervisor
   management_center:
+    profiles: ["embedded"]
     container_name: management-center
     image: hazelcast/management-center:latest
     ports:

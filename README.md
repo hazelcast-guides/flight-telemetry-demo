@@ -66,17 +66,34 @@ method).
 Docker must be running for this demo to work. 
 
 This demo application will output it's results to a Graphite database for visualization with Grafana as well as launch
-an instance of Management center to allow you to interact with the cluster.
+an instance of Management center (only if running in embedded mode - for viridian use the cloud Management Center) 
+which allows you to interact with the cluster.
 
 You can easily start a Graphite and Grafana instance and Management center instance in Docker using the provided `docker-compose.yml` and  `Makefile` script.
 
 The java application and docker-compose file makes use of a number of environment variables:
 
+(variables relating to source connection)
 *  FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY - This should contain your ADS-B Exchange API key
 *  FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST - This should contain the URL to the ADS-B exchange API
+
+(variables relating to sink connection)
 *  FLIGHT_TELEMETRY_SINK_HOST - This should contain the hostname or IP address for the docker host running the Graphite/Grafana instance (usually 127.0.0.1 or localhost)
+
+(variables relating to other demo settings)
+* FLIGHT_TELEMETRY_HZ_INSTANCE_MODE - (embedded/Viridian/bootstrap) If you want to run Hazelcast locally choose embedded otherwise to run on Viridian cloud set this to Viridian and provide the additional settings below
+
+(variables relating to Hazelcast Viridian see above, also, please read the Viridian section for additional steps)
+* FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_CLUSTERNAME - Your Viridian cluster name (see quick connection guide in your Viridian cloud console or sign-up at https://viridian.hazelcast.com/)
+* FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_DISCOVERYTOKEN - Your Viridian cluster discovery token (see quick connection guide in your Viridian cloud console)
+* FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE_PASSWORD - Your Viridian cluster keystore password (see quick connection guide in your Viridian cloud console)
+* FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE_PASSWORD - Your Viridian cluster truststore password (see quick connection guide in your Viridian cloud console)
+
+(variables relating to other demo settings)
 *  FLIGHT_TELEMETRY_WRITE_TO_FILE - (True/False) If you are using the API to poll live aircraft data this determines if the filtered data is written to a file sink (which can later be used as an off-line data source)
 *  FLIGHT_TELEMETRY_USE_OFFLINE_DATA - (True/False) If set to true the demo application with connect to the ADS-B Exchange API (note this API has a quota if you exceed it you will see HTTP 429 errors)
+
+(variables relating to Management Center configuration)
 *  FLIGHT_TELEMETRY_HZ_MEMBER_LIST - This should contain the hostname or IP address of the demo application and is used to allow management center to connect to the cluster (usually 127.0.0.1 or localhost)
 
 Examples for these environment variables can be found in the script sampleEnvironment.sh to use this on Linux/Mac use
@@ -111,15 +128,65 @@ $ make tail
 
 # Building the Application
 
-To build and package the application, run:
+Here we cover the maven command (and for the Enterprise edition pom.xml changes) required to build the application, the 
+correct steps will depend on if you are planning to run the open source edition of Hazelcast or the Enterprise edition.
+
+If you are running the open source version simply run (without changing the pom.xml):
 
 ```bash
 mvn clean package
 ```
 
+If you have a license for the enterprise version you will need change the pom.xml file to use the enterprise edition 
+dependencies. Open the pom.xml in your favourite text editor and search for "Select your Hazelcast dependency" you will 
+see two sections one for the open source edition and another for Viridian or Enterprise, uncomment the "viridian / enterprise" 
+section and comment out the two lines in the open source section as follows:
+
+```
+        <!-- Select your Hazelcast dependency -->
+        <!-- open source -->
+        <!--hazelcast.version>5.2-SNAPSHOT</hazelcast.version-->
+        <!--hazelcast.jar>hazelcast</hazelcast.jar-->
+
+        <!-- viridian or enterprise -->
+        <hazelcast.version>5.1</hazelcast.version>
+        <hazelcast.jar>hazelcast-enterprise</hazelcast.jar>
+```
+
+With the pom.xml modified build the application in the same way as for the open source version (remember you will still 
+need to supply the license key as described in the "Running the Application" section below).
+
 # Running the Application
 
-After building the application, run the application with:
+After building the application, you can run the application using either maven or java command lines.
+
+Here we cover the maven commands used to run the application, the correct command line will depend on if you are planning 
+to run the open source edition of Hazelcast or the Enterprise edition. 
+
+If you are running the open source version simply run (without changing the pom.xml or setting an environment variable):
+
+```bash
+mvn exec:java
+```
+
+If you have a license for the enterprise version you will need to provide it using one of the following methods:
+
+To run enterprise edition directly from the command line using maven you can provide the license key in the pom.xml or by 
+setting the MAVEN_OPTS environment variable e.g. :
+
+Using MAVEN_OPTS:
+
+```bash setting MAVEN_OPTS
+export MAVEN_OPTS=export MAVEN_OPTS="-Dhazelcast.enterprise.license.key=<YOUR_KEY_GOES_HERE>"                
+mvn exec:java
+```
+
+or by setting a system property in the pom.xml:
+
+Open the pom.xml and search for '<YOUR_KEY_GOES_HERE>' replace the placeholder with your own license key then uncomment
+the systemProperties section.
+
+You can now start the before application normally using:
 
 ```bash
 mvn exec:java
@@ -180,6 +247,17 @@ group by
 order by
   r;
 ```
+
+# Running on Viridian
+
+If you want to run on Viridian (see https://viridian.hazelcast.com/) you will need to complete the following steps
+
+1. Ensure you have configured the Viridian related environment variables (described above)
+2. Copy your client.keystore, client.pfx and client.truststore files to /src/main/resources
+3. Set the instance mode environment variable to viridian (See sampleEnvironment.sh)
+
+NOTE: The demo may still startup a Management Center instance however this will not be used, please instead use the
+Management Center instance linked to your Viridian cluster.
 
 
 
