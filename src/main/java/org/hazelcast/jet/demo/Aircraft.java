@@ -416,7 +416,7 @@ public class Aircraft implements JsonSerializable, Serializable {
         // if both are null assume the aircraft is grounded
 
         return this.alt_geom != null ? this.alt_geom == 0 :
-                    this.alt_baro != null ? this.alt_baro == 0 : true;
+                this.alt_baro == null || this.alt_baro == 0;
     }
 
     public Long getpos_time(long currentEpoch) {

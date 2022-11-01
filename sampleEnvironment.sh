@@ -17,6 +17,7 @@ export FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE_PASSWORD=
 # Configure other demo mode setting e.g. use offline data or write real-time data to file for future offline use
 export FLIGHT_TELEMETRY_WRITE_TO_FILE=false
 export FLIGHT_TELEMETRY_USE_OFFLINE_DATA=true
+export FLIGHT_TELEMETRY_OFFLINE_DATA_SOURCE=Local_File_System
 
 # Configure the member list (this is injected into the Management Center configuration)
 export FLIGHT_TELEMETRY_HZ_MEMBER_LIST=127.0.0.1

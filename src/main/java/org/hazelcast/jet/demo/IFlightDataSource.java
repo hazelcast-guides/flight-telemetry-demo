@@ -8,11 +8,11 @@ import java.io.IOException;
 
 public interface IFlightDataSource {
 
-    public void fillBuffer(SourceBuilder.TimestampedSourceBuffer<Aircraft> buffer) throws IOException;
+    void fillBuffer(SourceBuilder.TimestampedSourceBuffer<Aircraft> buffer) throws IOException;
 
-    public JsonObject pollForAircraft() throws IOException ;
+    JsonObject pollForAircraft() throws IOException ;
 
-    public static Aircraft parseAircraft(JsonValue ac) {
+    static Aircraft parseAircraft(JsonValue ac) {
         Aircraft aircraft = new Aircraft();
         aircraft.fromJson(ac.asObject());
         return aircraft;

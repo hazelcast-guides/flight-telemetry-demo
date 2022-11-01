@@ -1,4 +1,4 @@
-package org.hazelcast.jet.demo;
+package org.hazelcast.jet.demo.FlightDataSourceImpl;
 
 import com.hazelcast.internal.json.Json;
 import com.hazelcast.internal.json.JsonArray;
@@ -9,6 +9,8 @@ import com.hazelcast.jet.pipeline.SourceBuilder;
 import com.hazelcast.jet.pipeline.SourceBuilder.TimestampedSourceBuffer;
 import com.hazelcast.jet.pipeline.StreamSource;
 import com.hazelcast.logging.ILogger;
+import org.hazelcast.jet.demo.Aircraft;
+import org.hazelcast.jet.demo.IFlightDataSource;
 
 import javax.net.ssl.HttpsURLConnection;
 import java.io.*;
@@ -26,11 +28,11 @@ import static com.hazelcast.internal.util.StringUtil.isNullOrEmpty;
  * <p>
  * After a successful poll, this source filters out aircraft which are missing
  * registration number
- * and position timestamp. It will also records the latest position timestamp of
+ * and position timestamp. It will also record the latest position timestamp of
  * the aircraft so if
  * there are no update for an aircraft it will not be emitted from this source.
  */
-public class FlightDataSource implements IFlightDataSource{
+public class ADSBExchangeDataSource implements IFlightDataSource {
 
     /**
      * See <a href="https://www.adsbexchange.com/data/">ADS-B Exchange</a> for how
@@ -45,7 +47,7 @@ public class FlightDataSource implements IFlightDataSource{
      */
     protected String API_HOST = "YOUR_API_HOST_HERE";
 
-    protected boolean WRITE_FLIGHT_TELEMETRY_TO_FILE = false;
+    protected boolean WRITE_FLIGHT_TELEMETRY_TO_FILE;
 
     private final URL url;
     private final long pollIntervalMillis;
@@ -58,7 +60,7 @@ public class FlightDataSource implements IFlightDataSource{
     private long lastPoll;
 
 
-    private FlightDataSource(ILogger logger, String url, String host, String apiKey, Boolean writeTelemetryToFile, long pollIntervalMillis ) {
+    private ADSBExchangeDataSource(ILogger logger, String url, String host, String apiKey, Boolean writeTelemetryToFile, long pollIntervalMillis ) {
 
         this.logger = logger;
 
@@ -91,7 +93,7 @@ public class FlightDataSource implements IFlightDataSource{
 
             if (response != null) {
                 // Note, the documentation says now is seconds since the epoch but its actually ms
-                Long currentResponseTimeEpoc = response.get("now").asLong();
+                long currentResponseTimeEpoc = response.get("now").asLong();
                 JsonArray aircraftList = response.get("ac").asArray();
                 aircraftList.values().stream()
                         .map(IFlightDataSource::parseAircraft)
@@ -128,7 +130,7 @@ public class FlightDataSource implements IFlightDataSource{
             try {
                 con.setRequestMethod("GET");
                 con.addRequestProperty("User-Agent",
-                        "Mozilla / 5.0 (Windows NT 6.1; WOW64) AppleWebKit / 537.36 (KHTML, like Gecko) Chrome / 40.0.2214.91 Safari / 537.36");
+                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36");
                 con.addRequestProperty("X-RapidAPI-Key", API_AUTHENTICATION_KEY);
                 con.addRequestProperty("X-RapidAPI-Host", API_HOST);
 
@@ -147,15 +149,14 @@ public class FlightDataSource implements IFlightDataSource{
                 con.disconnect();
             }
         JsonValue value = Json.parse(response.toString());
-        JsonObject object = value.asObject();
-        return object;
+        return value.asObject();
     }
 
     public static StreamSource<Aircraft> getDataSource(String url, String host, String apiKey, Boolean writeTelemetryToFile, long pollIntervalMillis) {
 
         return SourceBuilder.timestampedStream("Flight Data Source",
-                ctx -> new FlightDataSource(ctx.logger(), url, host, apiKey, writeTelemetryToFile, pollIntervalMillis ))
-                .fillBufferFn(FlightDataSource::fillBuffer)
+                ctx -> new ADSBExchangeDataSource(ctx.logger(), url, host, apiKey, writeTelemetryToFile, pollIntervalMillis ))
+                .fillBufferFn(ADSBExchangeDataSource::fillBuffer)
                 .build();
 
     }

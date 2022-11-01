@@ -73,28 +73,32 @@ You can easily start a Graphite and Grafana instance and Management center insta
 
 The java application and docker-compose file makes use of a number of environment variables:
 
-(variables relating to source connection)
+(variables relating to flight data source connection)
 *  FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY - This should contain your ADS-B Exchange API key
-*  FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST - This should contain the URL to the ADS-B exchange API
+*  FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST - This should contain the hostname for the ADS-B exchange API
+*  FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_URI - This is the URL including parameter placeholders for the query service i.e. https://adsbexchange-com1.p.rapidapi.com/v2/lat/%.6f/lon/%.6f/dist/%d/
 
 (variables relating to sink connection)
 *  FLIGHT_TELEMETRY_SINK_HOST - This should contain the hostname or IP address for the docker host running the Graphite/Grafana instance (usually 127.0.0.1 or localhost)
 
 (variables relating to other demo settings)
-* FLIGHT_TELEMETRY_HZ_INSTANCE_MODE - (embedded/Viridian/bootstrap) If you want to run Hazelcast locally choose embedded otherwise to run on Viridian cloud set this to Viridian and provide the additional settings below
+*  FLIGHT_TELEMETRY_HZ_INSTANCE_MODE - (embedded/Viridian/bootstrap) If you want to run Hazelcast locally choose embedded otherwise to run on Viridian cloud set this to Viridian and provide the additional settings below
 
 (variables relating to Hazelcast Viridian see above, also, please read the Viridian section for additional steps)
-* FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_CLUSTERNAME - Your Viridian cluster name (see quick connection guide in your Viridian cloud console or sign-up at https://viridian.hazelcast.com/)
-* FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_DISCOVERYTOKEN - Your Viridian cluster discovery token (see quick connection guide in your Viridian cloud console)
-* FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE_PASSWORD - Your Viridian cluster keystore password (see quick connection guide in your Viridian cloud console)
-* FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE_PASSWORD - Your Viridian cluster truststore password (see quick connection guide in your Viridian cloud console)
+*  FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_CLUSTERNAME - Your Viridian cluster name (see quick connection guide in your Viridian cloud console or sign-up at https://viridian.hazelcast.com/)
+*  FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_DISCOVERYTOKEN - Your Viridian cluster discovery token (see quick connection guide in your Viridian cloud console)
+*  FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE_PASSWORD - Your Viridian cluster keystore password (see quick connection guide in your Viridian cloud console)
+*  FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE_PASSWORD - Your Viridian cluster truststore password (see quick connection guide in your Viridian cloud console)
 
 (variables relating to other demo settings)
 *  FLIGHT_TELEMETRY_WRITE_TO_FILE - (True/False) If you are using the API to poll live aircraft data this determines if the filtered data is written to a file sink (which can later be used as an off-line data source)
-*  FLIGHT_TELEMETRY_USE_OFFLINE_DATA - (True/False) If set to true the demo application with connect to the ADS-B Exchange API (note this API has a quota if you exceed it you will see HTTP 429 errors)
 
 (variables relating to Management Center configuration)
 *  FLIGHT_TELEMETRY_HZ_MEMBER_LIST - This should contain the hostname or IP address of the demo application and is used to allow management center to connect to the cluster (usually 127.0.0.1 or localhost)
+
+(variable related to use of offline data)
+*  FLIGHT_TELEMETRY_OFFLINE_DATA_SOURCE - This should be set to either S3 or Local_File_System and determines where data is loaded from
+*  FLIGHT_TELEMETRY_USE_OFFLINE_DATA - (True/False) If set to true the demo application with connect to the ADS-B Exchange API (note this API has a quota if you exceed it you will see HTTP 429 errors)
 
 Examples for these environment variables can be found in the script sampleEnvironment.sh to use this on Linux/Mac use
 the source command (or '.') as follows:

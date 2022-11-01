@@ -1,8 +1,5 @@
 package org.hazelcast.jet.demo;
 
-import com.hazelcast.client.HazelcastClient;
-import com.hazelcast.client.config.ClientConfig;
-import com.hazelcast.config.SSLConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.jet.JetService;
@@ -10,22 +7,21 @@ import com.hazelcast.jet.Job;
 import com.hazelcast.jet.config.JobConfig;
 import com.hazelcast.jet.config.ProcessingGuarantee;
 import com.hazelcast.jet.datamodel.KeyedWindowResult;
-import net.razorvine.pickle.Pickler;
-import org.hazelcast.jet.demo.Aircraft.VerticalDirection;
-import org.hazelcast.jet.demo.types.WakeTurbulanceCategory;
-import org.hazelcast.jet.demo.util.Util;
 import com.hazelcast.jet.pipeline.*;
 import com.hazelcast.map.IMap;
 import com.hazelcast.map.listener.EntryAddedListener;
-
-//import org.python.core.PyFloat;
-//import org.python.core.PyInteger;
-//import org.python.core.PyList;
-//import org.python.core.PyString;
-//import org.python.core.PyTuple;
-//import org.python.modules.cPickle;
+import net.razorvine.pickle.Pickler;
+import org.hazelcast.jet.demo.Aircraft.VerticalDirection;
+import org.hazelcast.jet.demo.FlightDataSourceImpl.ADSBExchangeDataSource;
+import org.hazelcast.jet.demo.FlightDataSourceImpl.OfflineDataSource;
+import org.hazelcast.jet.demo.OfflineDataLoaderImpl.LocalFileSystemLoader;
+import org.hazelcast.jet.demo.OfflineDataLoaderImpl.S3Loader;
+import org.hazelcast.jet.demo.types.WakeTurbulanceCategory;
+import org.hazelcast.jet.demo.util.HazelcastConnection.*;
+import org.hazelcast.jet.demo.util.Util;
 
 import java.io.BufferedOutputStream;
+import java.io.File;
 import java.net.Socket;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
@@ -36,33 +32,14 @@ import java.util.function.Consumer;
 
 import static com.hazelcast.function.ComparatorEx.comparingInt;
 import static com.hazelcast.jet.Util.entry;
-import static com.hazelcast.jet.aggregate.AggregateOperations.allOf;
-import static com.hazelcast.jet.aggregate.AggregateOperations.linearTrend;
-import static com.hazelcast.jet.aggregate.AggregateOperations.maxBy;
-import static com.hazelcast.jet.aggregate.AggregateOperations.summingDouble;
-import static com.hazelcast.jet.aggregate.AggregateOperations.toList;
-import static org.hazelcast.jet.demo.Aircraft.VerticalDirection.ASCENDING;
-import static org.hazelcast.jet.demo.Aircraft.VerticalDirection.CRUISE;
-import static org.hazelcast.jet.demo.Aircraft.VerticalDirection.DESCENDING;
-import static org.hazelcast.jet.demo.Aircraft.VerticalDirection.UNKNOWN;
-import static org.hazelcast.jet.demo.Constants.heavyWTCClimbingAltitudeToNoiseDb;
-import static org.hazelcast.jet.demo.Constants.heavyWTCDescendAltitudeToNoiseDb;
-import static org.hazelcast.jet.demo.Constants.mediumWTCClimbingAltitudeToNoiseDb;
-import static org.hazelcast.jet.demo.Constants.mediumWTCDescendAltitudeToNoiseDb;
-import static org.hazelcast.jet.demo.Constants.typeToLTOCycyleC02Emission;
-import static org.hazelcast.jet.demo.types.WakeTurbulanceCategory.HEAVY;
-import static org.hazelcast.jet.demo.util.Util.nearLHR;
-import static org.hazelcast.jet.demo.util.Util.nearLCY;
-import static org.hazelcast.jet.demo.util.Util.nearLGW;
-import static org.hazelcast.jet.demo.util.Util.nearEWR;
-import static org.hazelcast.jet.demo.util.Util.nearJFK;
-import static org.hazelcast.jet.demo.util.Util.nearLGA;
-import static org.hazelcast.jet.demo.util.Util.nearHND;
-import static org.hazelcast.jet.demo.util.Util.nearNRT;
-import static org.hazelcast.jet.demo.util.Util.setHazelcastInstance;
+import static com.hazelcast.jet.aggregate.AggregateOperations.*;
 import static com.hazelcast.jet.pipeline.SinkBuilder.sinkBuilder;
 import static java.util.Collections.emptySortedMap;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.hazelcast.jet.demo.Aircraft.VerticalDirection.*;
+import static org.hazelcast.jet.demo.types.WakeTurbulanceCategory.HEAVY;
+import static org.hazelcast.jet.demo.util.HazelcastConnection.createHazelcastInstance;
+import static org.hazelcast.jet.demo.util.Util.*;
 
 /**
  * This demo reads an ADS-B telemetry stream from the [ADS-B Exchange](<a href="https://www.adsbexchange.com/">...</a>)
@@ -86,7 +63,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
  * by a Grafana dashboard.
  * <p>
  * This demo can run in both online and offline mode. The online mode will retrieve
- * realtime flight positions from the ADS-B exchange API (please see the READM for
+ * realtime flight positions from the ADS-B exchange API (please see the README for
  * instructions on how to sign-up for an ADS-B Exchange API key). The offline mode
  * uses around 30 minutes of flight data captured during September 2022 which
  * ADS-B Exchange have kindly allowed us to distribute for your convenience.
@@ -162,7 +139,7 @@ public class FlightTelemetry {
     private static final String CO2_EMISSION_KEY_SUFFIX = "_C02_EMISSION";
     private static final String AVG_NOISE_KEY_SUFFIX = "_AVG_NOISE";
 
-    private static final int SINK_PORT = 2004;
+    private static final int FLIGHT_TELEMETRY_SINK_PORT;
     private static final String TAKE_OFF_MAP = "takeOffMap";
     private static final String LANDING_MAP = "landingMap";
     private static final String FLIGHT_TELEMETRY_SINK_HOST;
@@ -170,6 +147,9 @@ public class FlightTelemetry {
     private static final String FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST;
     private static final String FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_URI;
     private static final String FLIGHT_TELEMETRY_USE_OFFLINE_DATA;
+    private static final String FLIGHT_TELEMETRY_OFFLINE_DATA_SOURCE;
+    private static final String FLIGHT_TELEMETRY_OFFLINE_DATA_SOURCE_PATH;
+    private static final String FLIGHT_TELEMETRY_OFFLINE_DATA_SINK_PATH;
     private static final String FLIGHT_TELEMETRY_WRITE_TO_FILE;
     private static final String FLIGHT_TELEMETRY_HZ_INSTANCE_MODE;
 
@@ -181,6 +161,7 @@ public class FlightTelemetry {
     private static final String FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_URL;
     private static final String FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_CLUSTERNAME;
 
+    // Use getHighBandwidthConfig to pull all global traffic, this results ina  single job and higher bandwidth usage
     private static final Map<String, Map<String, String>> configData = FlightDataSourceConfig.getLowBandwidthConfig();
 
     static {
@@ -192,8 +173,16 @@ public class FlightTelemetry {
         FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_URI = getConfigurationParameter("FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_URI", "https://adsbexchange-com1.p.rapidapi.com/v2/lat/%.6f/lon/%.6f/dist/%d/");
 
         // General pipeline config
+        FLIGHT_TELEMETRY_SINK_PORT = Integer.parseInt(getConfigurationParameter("FLIGHT_TELEMETRY_SINK_PORT", "2004"));
         FLIGHT_TELEMETRY_SINK_HOST = getConfigurationParameter("FLIGHT_TELEMETRY_SINK_HOST", "127.0.0.1");
+
+        // Offline data source config
         FLIGHT_TELEMETRY_USE_OFFLINE_DATA = getConfigurationParameter("FLIGHT_TELEMETRY_USE_OFFLINE_DATA");
+        FLIGHT_TELEMETRY_OFFLINE_DATA_SOURCE = getConfigurationParameter("FLIGHT_TELEMETRY_OFFLINE_DATA_SOURCE", "LocalFileSystem");
+        FLIGHT_TELEMETRY_OFFLINE_DATA_SOURCE_PATH = getConfigurationParameter("FLIGHT_TELEMETRY_OFFLINE_DATA_SOURCE_PATH","flighttelemetry-offline-data");
+
+        FLIGHT_TELEMETRY_OFFLINE_DATA_SINK_PATH = getConfigurationParameter("FLIGHT_TELEMETRY_OFFLINE_DATA_SINK_PATH","flighttelemetry-offline-data-out");
+
         FLIGHT_TELEMETRY_WRITE_TO_FILE = getConfigurationParameter("FLIGHT_TELEMETRY_WRITE_TO_FILE");
         FLIGHT_TELEMETRY_HZ_INSTANCE_MODE = getConfigurationParameter("FLIGHT_TELEMETRY_HZ_INSTANCE_MODE", "embedded");
 
@@ -210,7 +199,8 @@ public class FlightTelemetry {
     public static void main(String[] args) {
         boolean useOfflineDataSource = Boolean.parseBoolean(FLIGHT_TELEMETRY_USE_OFFLINE_DATA);
         boolean writeTelemetryToFile = Boolean.parseBoolean(FLIGHT_TELEMETRY_WRITE_TO_FILE);
-        HazelcastInstance hzInstance;
+        HazelcastInstance hzInstance = null;
+        IOfflineDataLoader dataLoader = null;
 
         // If we are not using offline data check the required values have been passed
         if (!useOfflineDataSource) {
@@ -250,7 +240,7 @@ public class FlightTelemetry {
         if (writeTelemetryToFile && !useOfflineDataSource) {
             System.out.println("Flight telemetry will be written to a file for future playback.");
         } else {
-            if (writeTelemetryToFile && useOfflineDataSource) {
+            if (writeTelemetryToFile) {
                 System.out.println("WARNING: Both use offline data and write telemetry data to file are turned on however "
                         + "this is not allowed, writing telemetry to file will be automatically turned off.");
             }
@@ -258,21 +248,52 @@ public class FlightTelemetry {
             writeTelemetryToFile = false;
         }
 
-        try {
-            hzInstance = getHzInstance();
-            setHazelcastInstance(hzInstance);
-        } catch (URISyntaxException e) {
-            System.out.println("ERROR: Could not create or connect to the Hazelcast instance (instance mode was set to [" + FLIGHT_TELEMETRY_HZ_INSTANCE_MODE + "].");
-            return;
+        if (useOfflineDataSource){
+            if(FLIGHT_TELEMETRY_OFFLINE_DATA_SOURCE.equalsIgnoreCase(IOfflineDataLoader.DataSource.S3.toString())){
+                dataLoader = new S3Loader();
+            } else if(
+                    FLIGHT_TELEMETRY_OFFLINE_DATA_SOURCE.equalsIgnoreCase(IOfflineDataLoader.DataSource.LOCAL_FILE_SYSTEM.toString())){
+                dataLoader = new LocalFileSystemLoader();
+            } else {
+                System.out.println("ERROR: Unrecognised offline data loader please check FLIGHT_TELEMETRY_OFFLINE_DATA_SOURCE.");
+                System.exit(1);
+            }
         }
 
-        addListener(hzInstance.getMap(TAKE_OFF_MAP), a -> System.out.println("New aircraft taking off: " + a));
-        addListener(hzInstance.getMap(LANDING_MAP), a -> System.out.println("New aircraft landing " + a));
+        try {
+            if (FLIGHT_TELEMETRY_HZ_INSTANCE_MODE.equalsIgnoreCase(InstanceMode.VIRIDIAN.toString())) {
+                hzInstance = createHazelcastInstance(
+                        InstanceMode.VIRIDIAN.toString(), FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE,
+                        FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE_PASSWORD,
+                        FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE,
+                        FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE_PASSWORD,
+                        FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_CLUSTERNAME,
+                        FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_DISCOVERYTOKEN,
+                        FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_URL
+                );
+            } else {
+                hzInstance = createHazelcastInstance(FLIGHT_TELEMETRY_HZ_INSTANCE_MODE);
+            }
+
+        } catch (URISyntaxException | InstantiationException e) {
+            System.out.println("ERROR: Could not create or connect to the Hazelcast instance (instance mode was set to [" + FLIGHT_TELEMETRY_HZ_INSTANCE_MODE +
+                    "] the error reported was [" + e.getMessage() + "].");
+            System.exit(1);
+        }
 
         try {
             boolean finalUseOfflineDataSource = useOfflineDataSource;
             boolean finalWriteTelemetryToFile = writeTelemetryToFile;
+            HazelcastInstance finalHzInstance = hzInstance;
 
+            // Clear landing and takeoff maps
+            hzInstance.getMap(TAKE_OFF_MAP).clear();
+            hzInstance.getMap(LANDING_MAP).clear();
+
+            addListener(hzInstance.getMap(TAKE_OFF_MAP), a -> System.out.println("New aircraft taking off: " + a));
+            addListener(hzInstance.getMap(LANDING_MAP), a -> System.out.println("New aircraft landing " + a));
+
+            IOfflineDataLoader finalDataLoader = dataLoader;
             configData.keySet().parallelStream()
                     .peek(e -> {
                         StreamSource<Aircraft> dataSource;
@@ -285,10 +306,15 @@ public class FlightTelemetry {
 
                         // Build the data source class based on on-line / off-line mode
                         if (finalUseOfflineDataSource) {
-                            dataSource = OfflineDataSource.getDataSource("", hzInstance, e, 10000);
+
+                            long startEpoch = finalDataLoader.loadData(
+                                    e,
+                                    finalHzInstance,
+                                    FLIGHT_TELEMETRY_OFFLINE_DATA_SOURCE_PATH);
+                            dataSource = OfflineDataSource.getDataSource("", e, 10000, startEpoch);
 
                         } else {
-                            dataSource = FlightDataSource.getDataSource(
+                            dataSource = ADSBExchangeDataSource.getDataSource(
                                     String.format(FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_URI, radarLatitude, radarLongitude, radarRadius),
                                     FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_HOST,
                                     FLIGHT_TELEMETRY_ADSB_EXCHANGE_API_KEY,
@@ -305,7 +331,7 @@ public class FlightTelemetry {
 
                         Pipeline pipeline = buildPipeline(e, dataSource, finalWriteTelemetryToFile, floor, ceiling);
 
-                        JetService jetService = hzInstance.getJet();
+                        JetService jetService = finalHzInstance.getJet();
                         Job job = jetService.newJob(pipeline, new JobConfig().setName("FlightTelemetry-" + e)
                                 .setProcessingGuarantee(ProcessingGuarantee.EXACTLY_ONCE));
 
@@ -316,60 +342,15 @@ public class FlightTelemetry {
         } finally {
             Hazelcast.shutdownAll();
         }
+
+        System.exit(0);
     }
 
-    private static String getConfigurationParameter(String name, String defaultValue) {
-
-
-        Optional<String> systemPropertyValue = getSystemProperty(name);
-        Optional<String> environmentVariableValue = getEnvironmentVariable(name);
-
-        return systemPropertyValue.orElseGet(() -> environmentVariableValue.orElse(defaultValue));
-    }
-
-    private static String getConfigurationParameter(String name) {
-        return getConfigurationParameter(name, "");
-    }
-
-    private static Optional<String> getSystemProperty(String name) {
-        return Optional.ofNullable(System.getProperty(name));
-    }
-
-    private static Optional<String> getEnvironmentVariable(String name) {
-        return Optional.ofNullable(System.getenv(name));
-    }
-
-    private static HazelcastInstance getHzInstance() throws URISyntaxException {
-        if (FLIGHT_TELEMETRY_HZ_INSTANCE_MODE != null) {
-            if (FLIGHT_TELEMETRY_HZ_INSTANCE_MODE.equals("bootstrap")) {
-                return Hazelcast.bootstrappedInstance();
-            } else if (FLIGHT_TELEMETRY_HZ_INSTANCE_MODE.equals("viridian")) {
-                ClassLoader classLoader = FlightTelemetry.class.getClassLoader();
-                Properties props = new Properties();
-                props.setProperty("javax.net.ssl.keyStore", classLoader.getResource(FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE).toURI().getPath());
-                props.setProperty("javax.net.ssl.keyStorePassword", FLIGHT_TELEMETRY_HZ_CLIENT_KEYSTORE_PASSWORD);
-                props.setProperty("javax.net.ssl.trustStore",
-                        classLoader.getResource(FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE).toURI().getPath());
-                props.setProperty("javax.net.ssl.trustStorePassword", FLIGHT_TELEMETRY_HZ_CLIENT_TRUSTSTORE_PASSWORD);
-                ClientConfig config = new ClientConfig();
-                config.getNetworkConfig().setSSLConfig(new SSLConfig().setEnabled(true).setProperties(props));
-                config.getNetworkConfig().getCloudConfig()
-                        .setDiscoveryToken(FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_DISCOVERYTOKEN)
-                        .setEnabled(true);
-                config.setProperty("hazelcast.client.cloud.url", FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_URL);
-                config.setClusterName(FLIGHT_TELEMETRY_HZ_CLIENT_CLOUD_CLUSTERNAME);
-
-                return HazelcastClient.newHazelcastClient(config);
-            }
-        }
-
-        return Hazelcast.newHazelcastInstance();
-    }
 
     /**
      * Builds and returns the Pipeline which represents the actual computation.
      */
-    private static Pipeline buildPipeline(String cityName, StreamSource<Aircraft> dataSource, boolean writeTelemetryToFile, int FLOOR, int CEILING) {
+    private static Pipeline buildPipeline(String regionName, StreamSource<Aircraft> dataSource, boolean writeTelemetryToFile, int FLOOR, int CEILING) {
         Pipeline p = Pipeline.create();
 
         SlidingWindowDefinition slidingWindow = WindowDefinition.sliding(60_000, 30_000);
@@ -381,7 +362,7 @@ public class FlightTelemetry {
                 .withNativeTimestamps(SECONDS.toMillis(15));
 
         if (writeTelemetryToFile) {
-            ac.writeTo(Sinks.json(Util.getFlightDataLogPath(cityName)));
+            ac.writeTo(Sinks.json(FLIGHT_TELEMETRY_OFFLINE_DATA_SINK_PATH + File.separator + Util.getFlightDataFilePrefix(regionName)));
         }
 
         // Filter aircraft whose altitude is less than 3000ft (plus floor), calculate linear trend of their altitudes
@@ -458,7 +439,7 @@ public class FlightTelemetry {
 
 
         // Build Graphite sink
-        Sink<KeyedWindowResult> graphiteSink = buildGraphiteSink2(FLIGHT_TELEMETRY_SINK_HOST, SINK_PORT);
+        Sink<KeyedWindowResult> graphiteSink = buildGraphiteSink(FLIGHT_TELEMETRY_SINK_HOST, FLIGHT_TELEMETRY_SINK_PORT);
 
         // Drain all results to the Graphite sink
         p.writeTo(graphiteSink, co2Emission, maxNoise, landingFlights, takingOffFlights)
@@ -474,30 +455,12 @@ public class FlightTelemetry {
      * @param host Graphite host
      * @param port Graphite port
      */
-    /*private static Sink<KeyedWindowResult> buildGraphiteSink(String host, int port) {
+    private static Sink<KeyedWindowResult> buildGraphiteSink(String host, int port) {
         return sinkBuilder("graphite", instance ->
                 new BufferedOutputStream(
                         new Socket(host, port).getOutputStream()))
                 .<KeyedWindowResult>receiveFn((bos, entry) -> {
                     GraphiteMetric metric = new GraphiteMetric();
-                    metric.from(entry);
-
-                    PyString payload = cPickle.dumps(metric.getAsList(), 2);
-                    byte[] header = ByteBuffer.allocate(4).putInt(payload.__len__()).array();
-
-                    bos.write(header);
-                    bos.write(payload.toBytes());
-                })
-                .flushFn(BufferedOutputStream::flush)
-                .destroyFn(BufferedOutputStream::close)
-                .build();
-    }*/
-    private static Sink<KeyedWindowResult> buildGraphiteSink2(String host, int port) {
-        return sinkBuilder("graphite", instance ->
-                new BufferedOutputStream(
-                        new Socket(host, port).getOutputStream()))
-                .<KeyedWindowResult>receiveFn((bos, entry) -> {
-                    GraphiteMetric2 metric = new GraphiteMetric2();
                     metric.from(entry);
 
                     Pickler pickler = new Pickler(false);
@@ -546,7 +509,7 @@ public class FlightTelemetry {
      */
     private static Aircraft assignAirport(Aircraft aircraft) {
         if (aircraft.getalt() > 0 && !aircraft.isgnd()) {
-            String airport = getAirport(aircraft.getlon(), aircraft.getlat());
+            String airport = Airports.getAirport(aircraft.getlon(), aircraft.getlat());
             if (airport == null) {
                 return null;
             }
@@ -555,34 +518,6 @@ public class FlightTelemetry {
         return aircraft;
     }
 
-    /**
-     * Returns if the aircraft is in the defined radius area of the airport.
-     *
-     * @param lon longitude of the aircraft
-     * @param lat latitude of the aircraft
-     * @return name of the airport
-     */
-    private static String getAirport(Double lon, Double lat) {
-        if (nearLHR(lon, lat)) {
-            return "London Heathrow";
-        } else if (nearLCY(lon, lat)) {
-            return "London City";
-        } else if (nearLGW(lon, lat)) {
-            return "London Gatwick";
-        } else if (nearEWR(lon, lat)) {
-            return "New York Newark";
-        } else if (nearJFK(lon, lat)) {
-            return "New York JFK";
-        } else if (nearLGA(lon, lat)) {
-            return "New York LaGuardia";
-        } else if (nearHND(lon, lat)) {
-            return "Tokyo Haneda";
-        } else if (nearNRT(lon, lat)) {
-            return "Tokyo Narita";
-        }
-        // unknown city
-        return null;
-    }
 
     /**
      * Returns altitude to noise level lookup table for the aircraft based on its weight category
@@ -616,9 +551,6 @@ public class FlightTelemetry {
      * @return VerticalDirection enum value
      */
     private static VerticalDirection getVerticalDirection(double coefficient) {
-        if (coefficient == Double.NaN) {
-            return UNKNOWN;
-        }
         if (coefficient > 0) {
             return ASCENDING;
         } else if (coefficient == 0) {
@@ -642,79 +574,12 @@ public class FlightTelemetry {
     /**
      * A data transfer object for Graphite
      */
-    /*private static class GraphiteMetric {
-        PyString metricName;
-        PyInteger timestamp;
-        PyFloat metricValue;
-
-        private GraphiteMetric() {
-        }
-
-        private void fromAirCraftEntry(KeyedWindowResult<String, Aircraft> aircraftEntry) {
-            Aircraft aircraft = aircraftEntry.getValue();
-            metricName = new PyString(replaceWhiteSpace(aircraft.getairport()) + "." + aircraft.getverticaldirection());
-            timestamp = new PyInteger(getEpochSecond(aircraft.getpos_time()));
-            metricValue = new PyFloat(1);
-        }
-
-        private void fromMaxNoiseEntry(KeyedWindowResult<String, Integer> entry) {
-            metricName = new PyString(replaceWhiteSpace(entry.getKey()));
-            timestamp = new PyInteger(getEpochSecond(entry.end()));
-            metricValue = new PyFloat(entry.getValue());
-        }
-
-        private void fromTotalC02Entry(KeyedWindowResult<String, Double> entry) {
-            metricName = new PyString(replaceWhiteSpace(entry.getKey()));
-            timestamp = new PyInteger(getEpochSecond(entry.end()));
-            metricValue = new PyFloat(entry.getValue());
-        }
-
-        void from(KeyedWindowResult entry) {
-            // We need to check which type of entry we are processing (we tagged the noise and co2 map keys with a suffix
-            // so that we can easily work this out from the key name)
-            if (entry.getKey() instanceof String &&
-                    !(
-                            entry.getKey().toString().endsWith(CO2_EMISSION_KEY_SUFFIX) ||
-                                    entry.getKey().toString().endsWith(AVG_NOISE_KEY_SUFFIX)
-                    )
-            ) {
-                fromAirCraftEntry(entry);
-            } else {
-                // If the key ends with the CO2 suffix, process as CO2 metric
-                if (entry.getKey().toString().endsWith(CO2_EMISSION_KEY_SUFFIX)) {
-                    fromTotalC02Entry(entry);
-                } else {
-                    // This must be a noise entry, process as noise metric
-                    fromMaxNoiseEntry(entry);
-                }
-            }
-        }
-
-        PyList getAsList() {
-            PyList list = new PyList();
-            PyTuple metric = new PyTuple(metricName, new PyTuple(timestamp, metricValue));
-            list.add(metric);
-            return list;
-        }
-
-        private int getEpochSecond(long millis) {
-            return (int) Instant.ofEpochMilli(millis).getEpochSecond();
-        }
-
-        private String replaceWhiteSpace(String string) {
-            return string.replace(" ", "_");
-        }
-    }*/
-
-    /**
-     * A data transfer object for Graphite
-     */
-    private static class GraphiteMetric2 {
+    private static class GraphiteMetric {
         String metricName;//PyString metricName;
         Integer timestamp;//PyInteger timestamp;
         Float metricValue;//PyFloat metricValue;
 
-        private GraphiteMetric2() {
+        private GraphiteMetric() {
         }
 
         private void fromAirCraftEntry(KeyedWindowResult<String, Aircraft> aircraftEntry) {
@@ -774,4 +639,5 @@ public class FlightTelemetry {
             return string.replace(" ", "_");
         }
     }
+
 }

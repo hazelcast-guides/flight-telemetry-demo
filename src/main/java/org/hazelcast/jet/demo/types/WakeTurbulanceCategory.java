@@ -15,7 +15,7 @@ public enum WakeTurbulanceCategory {
     ROTORCRAFT(8);
 
 
-    private int id;
+    private final int id;
 
     WakeTurbulanceCategory(int id) {
         this.id = id;

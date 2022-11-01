@@ -1,9 +1,14 @@
 package org.hazelcast.jet.demo.util;
 
+import com.hazelcast.client.HazelcastClient;
+import com.hazelcast.client.config.ClientConfig;
+import com.hazelcast.config.SSLConfig;
+import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.internal.json.JsonValue;
 
-import java.util.List;
+import java.net.URISyntaxException;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.EMPTY_LIST;
@@ -11,97 +16,33 @@ import static java.util.Collections.EMPTY_LIST;
 /**
  * Helper methods for JSON parsing and geographic calculations.
  */
-public class Util {
+public class Util implements java.io.Serializable {
 
-    public static HazelcastInstance getHazelcastInstance() {
-        return hzInstance;
+
+    private static final String FLIGHT_DATA_FILE_PREFIX = "flightDataLog";
+
+
+    public static String getConfigurationParameter(String name, String defaultValue) {
+
+
+        Optional<String> systemPropertyValue = getSystemProperty(name);
+        Optional<String> environmentVariableValue = getEnvironmentVariable(name);
+
+        return systemPropertyValue.orElseGet(() -> environmentVariableValue.orElse(defaultValue));
     }
 
-    public static void setHazelcastInstance(HazelcastInstance hzInstance) {
-        Util.hzInstance = hzInstance;
+    public static String getConfigurationParameter(String name) {
+        return getConfigurationParameter(name, "");
     }
 
-    private static HazelcastInstance hzInstance;
-
-    private static final String FLIGHT_DATA_LOG_DIR = "flightData/flightDataLog";
-
-    public static int LONDON_RADAR_RADIUS = 70;
-    public static Double LONDON_AIRPORT_RADIUS = 10d;
-    public static Double NEWYORK_AIRPORT_RADIUS = 10d;
-    public static Double TOKYO_AIRPORT_RADIUS = 10d;
-
-    // Thee London airports LCY, LGW and LHR
-    public static Double LCY_LAT = 51.5048d;
-    public static Double LCY_LON = 0.0495d;
-   
-    public static Double LGW_LAT = 51.1537d;
-    public static Double LGW_LON = 0.1821d;
-    
-    public static Double LHR_LAT = 51.470020d;
-    public static Double LHR_LON = -0.454295d;
-
-    // Two Tokyo airports HND and NRT
-    public static Double HND_LAT = 35.5235366d;
-    public static Double HND_LON = 139.6987589d;
-
-    public static Double NRT_LAT = 35.771991d;
-    public static Double NRT_LON = 140.3906614d;  
-
-    // Three New york airports JFK, EWR and LGA
-    public static Double JFK_LAT = 40.6413153d;
-    public static Double JFK_LON = -73.780327d;
-
-    public static Double EWR_LAT = 40.6895354d;
-    public static Double EWR_LON = -74.1766511d; 
-
-    public static Double LGA_LAT = 40.7769311d;
-    public static Double LGA_LON = -73.8761546d;
-
-    public static boolean nearLCY(Double lon, Double lat) {
-        return inBoundariesOf(lon, lat, boundingBox(LCY_LON, LCY_LAT, LONDON_AIRPORT_RADIUS));
+    public static Optional<String> getSystemProperty(String name) {
+        return Optional.ofNullable(System.getProperty(name));
     }
 
-    public static boolean nearLGW(Double lon, Double lat) {
-        return inBoundariesOf(lon, lat, boundingBox(LGW_LON, LGW_LAT, LONDON_AIRPORT_RADIUS));
+    public static Optional<String> getEnvironmentVariable(String name) {
+        return Optional.ofNullable(System.getenv(name));
     }
 
-    public static boolean nearLHR(Double lon, Double lat) {
-        return inBoundariesOf(lon, lat, boundingBox(LHR_LON, LHR_LAT, LONDON_AIRPORT_RADIUS));
-    }
-
-    public static boolean nearLGA(Double lon, Double lat) {
-        return inBoundariesOf(lon, lat, boundingBox(LGA_LON, LGA_LAT, NEWYORK_AIRPORT_RADIUS));
-    }
-
-    public static boolean nearJFK(Double lon, Double lat) {
-        return inBoundariesOf(lon, lat, boundingBox(JFK_LON, JFK_LAT, NEWYORK_AIRPORT_RADIUS));
-    }
-
-    public static boolean nearEWR(Double lon, Double lat) {
-        return inBoundariesOf(lon, lat, boundingBox(EWR_LON, EWR_LAT, NEWYORK_AIRPORT_RADIUS));
-    }
-    public static boolean nearNRT(Double lon, Double lat) {
-        return inBoundariesOf(lon, lat, boundingBox(NRT_LON, NRT_LAT, TOKYO_AIRPORT_RADIUS));
-    }
-
-    public static boolean nearHND(Double lon, Double lat) {
-        return inBoundariesOf(lon, lat, boundingBox(HND_LON, HND_LAT, TOKYO_AIRPORT_RADIUS));
-    }
-
-    public static double[] boundingBox(Double lon, Double lat, Double radius) {
-        double lat_rad = Math.abs(Math.cos(Math.toRadians(lat)) * 69);
-
-        double boundingLon1 = lon + radius / lat_rad;
-        double boundingLon2 = lon - radius / lat_rad;
-        double boundingLat1 = lat + (radius / 69);
-        double boundingLat2 = lat - (radius / 69);
-        return new double[]{boundingLon1, boundingLat1, boundingLon2, boundingLat2};
-    }
-
-    public static boolean inBoundariesOf(Double lon, Double lat, double[] boundaries) {
-        return !(lon > boundaries[0] || lon < boundaries[2]) &&
-                !(lat > boundaries[1] || lat < boundaries[3]);
-    }
 
 
     public static float asFloat(JsonValue value) {
@@ -129,9 +70,8 @@ public class Util {
 
         } catch (NumberFormatException e) {
             longValue = value == null || !value.isNumber() ? -1l : (long) value.asDouble();
-        }
-        catch (Exception e) {
-            longValue = -1l;    
+        } catch (Exception e) {
+            longValue = -1l;
         }
         return longValue;
     }
@@ -163,15 +103,98 @@ public class Util {
         }
     }
 
-    public static String getFlightDataLogPath(String cityName) {
-        //LocalDateTime localDateTime = LocalDateTime.now();
-
-        //int minutes = localDateTime.getMinute();
-
-        // Round to nearest 'n' minutes
-        //int roundedMinutes = minutes - (minutes % 10);
-
-        //return String.format("%s-%s-%d%d%dT%d%02d", FLIGHT_DATA_LOG_DIR, cityName, localDateTime.getYear(), localDateTime.getMonthValue(), localDateTime.getDayOfMonth(), localDateTime.getHour(), roundedMinutes);
-        return String.format("%s-%s", FLIGHT_DATA_LOG_DIR, cityName);
+    public static String getFlightDataFilePrefix(String regionName) {
+        return String.format("%s-%s/", FLIGHT_DATA_FILE_PREFIX, regionName);
     }
+
+
+    public static final SortedMap<Integer, Integer> mediumWTCDescendAltitudeToNoiseDb = new TreeMap<>() {{
+        put(4000, 50);
+        put(3000, 63);
+        put(2000, 71);
+        put(1000, 86);
+        put(500, 93);
+    }};
+    public static final SortedMap<Integer, Integer> heavyWTCDescendAltitudeToNoiseDb = new TreeMap<>() {{
+        put(4000, 57);
+        put(3000, 70);
+        put(2000, 79);
+        put(1000, 94);
+        put(500, 100);
+    }};
+    public static final SortedMap<Integer, Integer> heavyWTCClimbingAltitudeToNoiseDb = new TreeMap<>() {{
+        put(500, 96);
+        put(1000, 92);
+        put(1500, 86);
+        put(2000, 82);
+        put(3000, 72);
+        put(4000, 59);
+    }};
+
+    public static final SortedMap<Integer, Integer> mediumWTCClimbingAltitudeToNoiseDb = new TreeMap<>() {{
+        put(500, 83);
+        put(1000, 81);
+        put(1500, 74);
+        put(2000, 68);
+        put(3000, 61);
+        put(4000, 48);
+    }};
+
+
+    public static final Map<String, Double> typeToLTOCycyleC02Emission = new HashMap<>() {{
+        /*
+         * Figures for CO2 emmissions are taken from the 2019 EMEP/EEA air pollutant emission inventory guidebook (2019)
+         *
+         *   Link:  https://www.eea.europa.eu/publications/emep-eea-guidebook-2019/part-b-sectoral-guidance-chapters/1-energy/1-a-combustion/1-a-3-a-aviation
+         *
+         * Older aircraft no longer listed but still appearing below are assumed correct at the time of writing.
+         *
+         */
+        put("A306", 5427.89d);
+        put("A310", 4821.24d);
+        put("A318", 2169d);
+        put("A319", 2169.76d);
+        put("A320", 2570.93d);
+        put("A321", 2560d);
+        put("A332", 6829.44d);
+        put("A333", 6829.44d);
+        put("A343", 6362.65);
+        put("A345", 10329.23);
+        put("A346", 10624.82d);
+        put("A359", 6026d);
+        put("A380", 13048.56);
+        put("A388", 13048d);
+        put("B735", 2305d);
+        put("B737", 2597.65d);
+        put("B738", 2775.47d);
+        put("B739", 2500d);
+        put("B742", 9684.89d);
+        put("B743", 9684.89d);
+        put("B744", 10456.98d);
+        put("B748", 10400d);
+        put("B752", 4292.19d);
+        put("B753", 4610.47d);
+        put("B762", 4607.37d);
+        put("B763", 5449.29d);
+        put("B772", 7580.19d);
+        put("B773", 8072.95d);
+        put("B77L", 9076d);
+        put("B77W", 9736.15d);
+        put("B788", 10944.46d);
+        put("B789", 10300d);
+        put("CRJ9", 2754d);
+        put("CRJ2", 1560d);
+        put("CRJ7", 2010d);
+        put("DC10", 7460d);
+        put("DC8", 5339.85d);
+        put("DH8D", 1950d);
+        put("E145", 1505d);
+        put("E170", 1516.91d);
+        put("E175", 1516.91d);
+        put("E190", 1605d);
+        put("F27", 684.03d);
+        put("MD11", 8277.92d);
+        put("T39", 578.6d);
+    }};
+
 }
