@@ -109,6 +109,7 @@ public class Util implements java.io.Serializable {
 
 
     public static final SortedMap<Integer, Integer> mediumWTCDescendAltitudeToNoiseDb = new TreeMap<>() {{
+        put(10000, 0);
         put(4000, 50);
         put(3000, 63);
         put(2000, 71);
@@ -116,6 +117,7 @@ public class Util implements java.io.Serializable {
         put(500, 93);
     }};
     public static final SortedMap<Integer, Integer> heavyWTCDescendAltitudeToNoiseDb = new TreeMap<>() {{
+        put(10000, 0);
         put(4000, 57);
         put(3000, 70);
         put(2000, 79);
@@ -129,6 +131,7 @@ public class Util implements java.io.Serializable {
         put(2000, 82);
         put(3000, 72);
         put(4000, 59);
+        put(10000, 0);
     }};
 
     public static final SortedMap<Integer, Integer> mediumWTCClimbingAltitudeToNoiseDb = new TreeMap<>() {{
@@ -138,6 +141,7 @@ public class Util implements java.io.Serializable {
         put(2000, 68);
         put(3000, 61);
         put(4000, 48);
+        put(10000, 0);
     }};
 
 

@@ -33,6 +33,22 @@ public class FlightDataSourceConfig {
                         "FLOOR", "303",
                         "CEILING", "3303"
                 ),
+                "Las Vegas", Map.of(
+                        // Setting to radar radius to 35 KM to pickup traffic for LAS
+                        "RADAR_RADIUS", "35", // Half max distance + 10KM
+
+                        // This is the lat long for 16 Manhattan Ave, Brooklyn, NY 11206 an undistinguished address in Manhattan
+                        // which is the approximate center point of JFK, EWR and LGA airports
+                        "RADAR_LAT", "36.086010",
+                        "RADAR_LON", "-115.153969",
+
+                        // Floor is the minimum altitude we consider a flight for altitude trend analysis
+                        // we want to detect aircraft off the ground but still ascending (usually 100
+                        // + the altitude of the airport - Las Vegas is 2,181 ft)
+                        // Ceiling is the maximum altitude we consider a flight for altitude trend analysis (usually 3000 + the floor)
+                        "FLOOR", "2281",
+                        "CEILING", "5281"
+                ),
                 "New York", Map.of(
                         // Setting to radar radius to 70 KM to pickup traffic for the three main New York airports
                         // (distance between airports is

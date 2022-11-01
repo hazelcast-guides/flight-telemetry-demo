@@ -65,11 +65,11 @@
             },
             {
               "refId": "B",
-              "target": "alias(movingAverage(London_City_C02_EMISSION, '5min'), 'London City')"
+              "target": "alias(movingAverage(London_Heathrow_C02_EMISSION, '5min'), 'London Heathrow')"
             },
             {
               "refId": "C",
-              "target": "alias(movingAverage(London_Heathrow_C02_EMISSION, '5min'), 'London Heathrow')"
+              "target": "alias(movingAverage(Las_Vegas_C02_EMISSION, '5min'), 'Las Vegas')"
             },
             {
               "refId": "D",
@@ -166,11 +166,11 @@
             },
             {
               "refId": "B",
-              "target": "alias(movingAverage(London_City_AVG_NOISE, '5min'), 'London City')"
+              "target": "alias(movingAverage(London_Gatwick_AVG_NOISE, '5min'), 'London Gatwick')"
             },
             {
               "refId": "C",
-              "target": "alias(movingAverage(London_Gatwick_AVG_NOISE, '5min'), 'London Gatwick')"
+              "target": "alias(movingAverage(Las_Vegas_AVG_NOISE, '5min'), 'Las Vegas')"
             },
             {
               "refId": "D",
@@ -333,79 +333,6 @@
             "thresholdLabels": false,
             "thresholdMarkers": true
           },
-          "id": 4,
-          "interval": null,
-          "links": [],
-          "mappingType": 1,
-          "mappingTypes": [
-            {
-              "name": "value to text",
-              "value": 1
-            },
-            {
-              "name": "range to text",
-              "value": 2
-            }
-          ],
-          "maxDataPoints": 100,
-          "nullPointMode": "connected",
-          "nullText": null,
-          "postfix": "",
-          "postfixFontSize": "50%",
-          "prefix": "Took off",
-          "prefixFontSize": "80%",
-          "rangeMaps": [
-            {
-              "from": "null",
-              "text": "N/A",
-              "to": "null"
-            }
-          ],
-          "span": 3,
-          "sparkline": {
-            "fillColor": "rgba(31, 118, 189, 0.18)",
-            "full": false,
-            "lineColor": "rgb(31, 120, 193)",
-            "show": false
-          },
-          "tableColumn": "",
-          "targets": [
-            {
-              "refId": "A",
-              "target": "London_City.ASCENDING"
-            }
-          ],
-          "thresholds": "",
-          "title": "London City",
-          "type": "singlestat",
-          "valueFontSize": "80%",
-          "valueMaps": [
-            {
-              "op": "=",
-              "text": "N/A",
-              "value": "null"
-            }
-          ],
-          "valueName": "total"
-        },
-        {
-          "cacheTimeout": null,
-          "colorBackground": false,
-          "colorValue": true,
-          "colors": [
-            "#299c46",
-            "rgba(237, 129, 40, 0.89)",
-            "#d44a3a"
-          ],
-          "datasource": "Local Graphite",
-          "format": "none",
-          "gauge": {
-            "maxValue": 100,
-            "minValue": 0,
-            "show": false,
-            "thresholdLabels": false,
-            "thresholdMarkers": true
-          },
           "id": 5,
           "interval": null,
           "links": [],
@@ -479,6 +406,79 @@
             "thresholdLabels": false,
             "thresholdMarkers": true
           },
+            "id": 4,
+            "interval": null,
+            "links": [],
+            "mappingType": 1,
+            "mappingTypes": [
+              {
+                "name": "value to text",
+                "value": 1
+              },
+              {
+                "name": "range to text",
+                "value": 2
+              }
+            ],
+            "maxDataPoints": 100,
+            "nullPointMode": "connected",
+            "nullText": null,
+            "postfix": "",
+            "postfixFontSize": "50%",
+            "prefix": "Took off",
+            "prefixFontSize": "80%",
+            "rangeMaps": [
+              {
+                "from": "null",
+                "text": "N/A",
+                "to": "null"
+              }
+            ],
+            "span": 3,
+            "sparkline": {
+              "fillColor": "rgba(31, 118, 189, 0.18)",
+              "full": false,
+              "lineColor": "rgb(31, 120, 193)",
+              "show": false
+            },
+            "tableColumn": "",
+            "targets": [
+              {
+                "refId": "A",
+              "target": "Las_Vegas.ASCENDING"
+              }
+            ],
+            "thresholds": "",
+            "title": "Las Vegas Harry Reid",
+            "type": "singlestat",
+            "valueFontSize": "80%",
+            "valueMaps": [
+              {
+                "op": "=",
+                "text": "N/A",
+                "value": "null"
+              }
+            ],
+            "valueName": "total"
+          },
+          {
+            "cacheTimeout": null,
+            "colorBackground": false,
+            "colorValue": true,
+            "colors": [
+              "#299c46",
+              "rgba(237, 129, 40, 0.89)",
+              "#d44a3a"
+            ],
+            "datasource": "Local Graphite",
+            "format": "none",
+            "gauge": {
+              "maxValue": 100,
+              "minValue": 0,
+              "show": false,
+              "thresholdLabels": false,
+              "thresholdMarkers": true
+            },
           "id": 6,
           "interval": null,
           "links": [],
@@ -930,80 +930,6 @@
             "thresholdLabels": false,
             "thresholdMarkers": true
           },
-          "id": 12,
-          "interval": null,
-          "links": [],
-          "mappingType": 1,
-          "mappingTypes": [
-            {
-              "name": "value to text",
-              "value": 1
-            },
-            {
-              "name": "range to text",
-              "value": 2
-            }
-          ],
-          "maxDataPoints": 100,
-          "nullPointMode": "connected",
-          "nullText": null,
-          "postfix": "",
-          "postfixFontSize": "50%",
-          "prefix": "Landed",
-          "prefixFontSize": "80%",
-          "rangeMaps": [
-            {
-              "from": "null",
-              "text": "N/A",
-              "to": "null"
-            }
-          ],
-          "span": 3,
-          "sparkline": {
-            "fillColor": "rgba(31, 118, 189, 0.18)",
-            "full": false,
-            "lineColor": "rgb(31, 120, 193)",
-            "show": false
-          },
-          "tableColumn": "",
-          "targets": [
-            {
-              "hide": false,
-              "refId": "A",
-              "target": "London_City.DESCENDING"
-            }
-          ],
-          "thresholds": "",
-          "title": "London City",
-          "type": "singlestat",
-          "valueFontSize": "80%",
-          "valueMaps": [
-            {
-              "op": "=",
-              "text": "N/A",
-              "value": "null"
-            }
-          ],
-          "valueName": "total"
-        },
-        {
-          "cacheTimeout": null,
-          "colorBackground": false,
-          "colorValue": true,
-          "colors": [
-            "#299c46",
-            "rgba(237, 129, 40, 0.89)",
-            "#d44a3a"
-          ],
-          "datasource": "Local Graphite",
-          "format": "none",
-          "gauge": {
-            "maxValue": 100,
-            "minValue": 0,
-            "show": false,
-            "thresholdLabels": false,
-            "thresholdMarkers": true
-          },
           "id": 13,
           "interval": null,
           "links": [],
@@ -1078,6 +1004,80 @@
             "thresholdLabels": false,
             "thresholdMarkers": true
           },
+            "id": 12,
+            "interval": null,
+            "links": [],
+            "mappingType": 1,
+            "mappingTypes": [
+              {
+                "name": "value to text",
+                "value": 1
+              },
+              {
+                "name": "range to text",
+                "value": 2
+              }
+            ],
+            "maxDataPoints": 100,
+            "nullPointMode": "connected",
+            "nullText": null,
+            "postfix": "",
+            "postfixFontSize": "50%",
+            "prefix": "Landed",
+            "prefixFontSize": "80%",
+            "rangeMaps": [
+              {
+                "from": "null",
+                "text": "N/A",
+                "to": "null"
+              }
+            ],
+            "span": 3,
+            "sparkline": {
+              "fillColor": "rgba(31, 118, 189, 0.18)",
+              "full": false,
+              "lineColor": "rgb(31, 120, 193)",
+              "show": false
+            },
+            "tableColumn": "",
+            "targets": [
+              {
+                "hide": false,
+                "refId": "A",
+              "target": "Las_Vegas.DESCENDING"
+              }
+            ],
+            "thresholds": "",
+            "title": "Las Vegas Harry Reid",
+            "type": "singlestat",
+            "valueFontSize": "80%",
+            "valueMaps": [
+              {
+                "op": "=",
+                "text": "N/A",
+                "value": "null"
+              }
+            ],
+            "valueName": "total"
+          },
+          {
+            "cacheTimeout": null,
+            "colorBackground": false,
+            "colorValue": true,
+            "colors": [
+              "#299c46",
+              "rgba(237, 129, 40, 0.89)",
+              "#d44a3a"
+            ],
+            "datasource": "Local Graphite",
+            "format": "none",
+            "gauge": {
+              "maxValue": 100,
+              "minValue": 0,
+              "show": false,
+              "thresholdLabels": false,
+              "thresholdMarkers": true
+            },
           "id": 14,
           "interval": null,
           "links": [],
@@ -1476,5 +1476,5 @@
   },
   "timezone": "",
   "title": "Flight Telemetry",
-  "version": 5
+  "version": 1
 }

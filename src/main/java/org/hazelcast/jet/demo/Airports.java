@@ -4,6 +4,7 @@ public class Airports {
     public static Double LONDON_AIRPORT_RADIUS = 10d;
     public static Double NEWYORK_AIRPORT_RADIUS = 10d;
     public static Double TOKYO_AIRPORT_RADIUS = 10d;
+    public static Double LASVEGAS_AIRPORT_RADIUS = 10d;
 
     // Thee London airports LCY, LGW and LHR
     public static Double LCY_LAT = 51.5048d;
@@ -31,6 +32,9 @@ public class Airports {
 
     public static Double LGA_LAT = 40.7769311d;
     public static Double LGA_LON = -73.8761546d;
+
+    public static Double LAS_LAT = 36.086010d;
+    public static Double LAS_LON = -115.153969d;
 
 
     public static boolean nearLCY(Double lon, Double lat) {
@@ -65,6 +69,10 @@ public class Airports {
         return inBoundariesOf(lon, lat, boundingBox(HND_LON, HND_LAT, TOKYO_AIRPORT_RADIUS));
     }
 
+    public static boolean nearLAS(Double lon, Double lat) {
+        return inBoundariesOf(lon, lat, boundingBox(LAS_LON, LAS_LAT, LASVEGAS_AIRPORT_RADIUS));
+    }
+
     public static double[] boundingBox(Double lon, Double lat, Double radius) {
         double lat_rad = Math.abs(Math.cos(Math.toRadians(lat)) * 69);
 
@@ -97,6 +105,8 @@ public class Airports {
             return "Tokyo Haneda";
         } else if (nearNRT(lon, lat)) {
             return "Tokyo Narita";
+        } else if (nearLAS(lon, lat)) {
+            return "Las Vegas";
         }
         // unknown city
         return null;
