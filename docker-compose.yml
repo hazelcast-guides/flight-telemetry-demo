@@ -1,11 +1,12 @@
 version: '3.9'
 services:
   grafana_graphite:
+    image: jondiamond/flight-telemetry-grafana_graphite:latest
     build: docker-grafana-graphite/.
     container_name: grafana-dashboard
     ports:
-      - '80:80'
-      - '81:81'
+      - '8080:80'
+      - '8081:81'
       - '8125:8125/udp'
       - '8126:8126'
       - '2003:2003'
