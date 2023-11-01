@@ -1,20 +1,26 @@
-version: '3.9'
 services:
-  grafana_graphite:
-    build: docker-grafana-graphite/.
-    container_name: grafana-dashboard
+  graphite:
+    image: "graphiteapp/graphite-statsd:1.1.10-5"
     ports:
-      - '80:80'
-      - '81:81'
-      - '8125:8125/udp'
-      - '8126:8126'
-      - '2003:2003'
-      - '2004:2004'
+      - "80:80"
+      - "2003:2003"
+      - "2004:2004"
+      - "2023:2023"
+      - "2024:2024"
+      - "8125:8125/udp"
+      - "8126:8126"
+  grafana:
+    depends_on:
+      - graphite
+    image: "grafana/grafana:10.2.0-ubuntu"
+    ports:
+      - "3000:3000"
     volumes:
-      - ./data/whisper:/opt/graphite/storage/whisper
-      - ./data/grafana:/opt/grafana/data
-      - ./log/graphite:/opt/graphite/storage/log
-      - ./log/supervisor:/var/log/supervisor
+      - ./docker-grafana-graphite/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./docker-grafana-graphite/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana-data:/var/lib/grafana
+    links:
+      - "graphite:graphite"
   management_center:
     profiles: ["embedded"]
     container_name: management-center
@@ -24,3 +30,5 @@ services:
     environment:
       - MC_DEFAULT_CLUSTER=FlightTelemetry
       - MC_DEFAULT_CLUSTER_MEMBERS=${FLIGHT_TELEMETRY_HZ_MEMBER_LIST}
+volumes:
+  grafana-data:

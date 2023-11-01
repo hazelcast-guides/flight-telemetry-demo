@@ -5,19 +5,10 @@ CONTAINER = grafana-dashboard
 
 .PHONY: up
 
-prep :
-	mkdir -p \
-		data/whisper \
-		data/elasticsearch \
-		data/grafana \
-		log/graphite \
-		log/graphite/webapp \
-		log/elasticsearch
+clean : 
+	rm -f grafana-data/*.db 
 
-clean : prep
-	docker-compose build --no-cache && docker-compose up -d
-
-up : prep
+up :
 	docker-compose --profile=${FLIGHT_TELEMETRY_HZ_INSTANCE_MODE} up -d
 
 down :
